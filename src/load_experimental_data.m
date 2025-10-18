@@ -1,0 +1,62 @@
+function [exp_data] = load_experimental_data(constants)
+%LOAD_EXPERIMENTAL_DATA Loads and structures the experimental data from TCABR.
+%   This function performs two main tasks:
+%   1. Reads the base profile data (Te, ne, ni, n0) from the text file.
+%   2. Defines the specific, hard-coded experimental data points for
+%      toroidal velocity and ion temperature used in subsequent analyses.
+%
+%   Syntax:
+%       exp_data = load_experimental_data(constants)
+%
+%   Input:
+%       constants - A structure containing file paths and other parameters.
+%
+%   Output:
+%       exp_data - A structure containing all raw and experimental data.
+
+fprintf('Loading experimental data...\n');
+
+% --- 1. Load Base Profiles from File ---
+% These are general profiles from the experiment.
+opts = detectImportOptions(constants.data.path, 'FileType', 'text');
+opts.VariableNames = {'r', 'Te', 'Ti_unused', 'ne', 'ni', 'nCI', 'nCII', 'nCIII', 'nCIV', 'nCV', 'nCVI', 'nCVII', 'n0', 'pi', 'p'};
+opts.DataLines = 2;
+raw_table = readtable(constants.data.path, opts);
+
+exp_data.r_profiles = raw_table.r;      % Radial grid for profiles [m]
+exp_data.ne_raw = raw_table.ne;         % Raw electron density profile [m^-3]
+exp_data.ni_raw = raw_table.ni;         % Raw ion density profile [m^-3]
+
+fprintf('Base profiles loaded.\n');
+
+% --- 2. Define Hard-coded Experimental Data Points ---
+% These are the specific, discrete data points used for the primary fits.
+
+% Experimental Toroidal Velocity Data
+exp_data.r_Vphi_exp = [5.02E-04; 0.0104; 0.02036; 0.03026; 0.04009; 0.05005; 0.06001; ...
+    0.06991; 0.07981; 0.08977; 0.10013; 0.11; 0.11989; 0.12985; 0.13966; ...
+    0.14962; 0.15958; 0.1695; 0.17971]; % [m]
+
+exp_data.Vphi_exp = -[21.03307; 24.12041; 25.06326; 27.04137; 25.96912; 24.15739; ...
+    20.05325; 18.62974; 13.1021; 12.529; 10.99457; 8.12907; 8.07361; ...
+    8.0921; 2.9342; -4.0909; 1.99135; 2.89722; 1.10397]; % [km/s]
+
+exp_data.Vphi_err_exp = abs(-[0.94284; 1.81174; 0.90586; 2.01510; 1.44200; 2.34786; ...
+    1.81174; 1.42351; 1.79325; 1.42351; 0.53613; 1.23864; 0.88738; ...
+    0.88738; 3.08734; 1.99660; 4.58480; 3.49406; 3.38314]); % [km/s]
+
+% Experimental Ion Temperature Data (as used in the monolithic script fit)
+exp_data.r_Ti_exp = [0.1021; 4.5631; 6.6125; 10; 12; 14; 16; 17] / 100; % [m]
+exp_data.Ti_exp_raw = [154.3163; 142.5772; 118.2958; 81; 65; 51; 31; 32]; % [eV]
+exp_data.Ti_err_exp_raw = [12.5423; 8.897; 9.7002; 16; 15; 13; 10; 11]; % [eV]
+
+% The monolithic code uses a "reconstructed" version for the fit. We store it here.
+exp_data.Ti_reconstructed_exp = [269.9322956; 212.6290401; 154.5794833; ...
+    94.59042348; 72.86028761; 58.16568356; 30.5396089; 32]; % [eV]
+relative_errors = exp_data.Ti_err_exp_raw ./ exp_data.Ti_exp_raw;
+exp_data.Ti_reconstructed_err_exp = relative_errors .* exp_data.Ti_reconstructed_exp; % [eV]
+
+fprintf('Specific experimental data points defined.\n');
+fprintf('Data loading complete.\n\n');
+
+end
