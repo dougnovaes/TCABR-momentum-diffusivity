@@ -59,7 +59,7 @@ fprintf('Performing primary fit for optimal parameters...\n');
 try
     params_optimized = lsqnonlin(weighted_residual, initial_guess, lower_bounds, upper_bounds, options);
 catch ME
-    warning('Primary fit failed: %s. Using initial guess as optimised parameters.', ME.message);
+    warning(ME.identifier, 'Primary fit failed: %s. Using initial guess as optimised parameters.', ME.message);
     params_optimized = initial_guess;
 end
 ti_fit_primary = Ti_function(params_optimized, r_fine);
