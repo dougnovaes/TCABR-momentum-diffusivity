@@ -1,4 +1,4 @@
-function [velocity_results] = analyze_velocity_profile(exp_data, constants)
+function [velocity_results] = analyze_velocity_profile(exp_data, constants, r_fine)
 %ANALYZE_VELOCITY_PROFILE Performs a detailed statistical analysis of the toroidal velocity profile.
 %   This function executes a robust analysis of the experimental toroidal
 %   velocity data. Its main tasks are:
@@ -32,9 +32,6 @@ v_phi_err   = exp_data.Vphi_err_exp * 1000; % Convert km/s to m/s
 n_iter      = constants.analysis.num_iterations;
 a           = constants.machine.a;
 epsilon     = constants.machine.epsilon_aspect_ratio;
-
-% Define a fine radial grid for high-resolution profile results
-r_fine = linspace(eps, a, constants.analysis.num_radial_points)';
 
 % --- 2. Monte Carlo Bootstrap for Polynomial Fit ---
 % This loop fits a weighted polynomial for n_iter random perturbations

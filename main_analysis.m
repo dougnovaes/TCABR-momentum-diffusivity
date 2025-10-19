@@ -1,63 +1,91 @@
 % =========================================================================
 % TCABR MOMENTUM ANALYSIS - MAIN SCRIPT
 % =========================================================================
-
 clc; clear; close all;
 fprintf('Initiating TCABR momentum analysis script...\n\n');
 
-% Add function directories to the MATLAB path
 addpath('src', 'plotting', 'utils');
 
 % --- STAGE 1: Setup and Data Loading ---
 constants = setup_constants();
 exp_data = load_experimental_data(constants);
 
+% --- Define the Single Source of Truth for the Radial Grid ---
+% All subsequent calculations will use this high-resolution grid from the data file.
+r_fine = exp_data.r_profiles;
+
 % --- STAGE 2: Profile Analyses ---
-velocity_results = analyze_velocity_profile(exp_data, constants);
-temperature_results = analyze_temperature_profile(exp_data, constants);
+% Pass the unified r_fine grid to all analysis functions.
+velocity_results = analyze_velocity_profile(exp_data, constants, r_fine);
+temperature_results = analyze_temperature_profile(exp_data, constants, r_fine);
 
 % --- STAGE 3: Physics Profile Calculations ---
-% Using the fine radial grid from the velocity analysis results
-r_fine = velocity_results.r_fine;
 magnetic_field = compute_magnetic_field(r_fine, constants);
+derived_profiles = compute_derived_profiles(exp_data, temperature_results, magnetic_field, constants, r_fine);
 
+% --- Verification Step: Plotting All Key Profiles ---
+fprintf('Verification: Plotting all key analysis results...\n');
+% The normalised radius is created here for plotting purposes ONLY.
+r_norm = r_fine / constants.machine.a;
 
-% --- Verification Step ---
-fprintf('Verification: Plotting key analysis results...\n');
-
-% Figure 1: Velocity Profile Verification
-% ... (código do plot de velocidade) ...
-figure('Name', 'Velocity Profile Analysis Verification');
+% --- Figure 1: Velocity Profile (Matches Thesis Fig. 3.5) ---
+figure('Name', 'Velocity Profile Analysis');
 hold on; grid on; box on;
 errorbar(exp_data.r_Vphi_exp / constants.machine.a, exp_data.Vphi_exp, exp_data.Vphi_err_exp, 'ko', 'MarkerFaceColor', 'k', 'DisplayName', 'Experimental Data');
-plot(velocity_results.r_fine / constants.machine.a, velocity_results.poly_fit_avg / 1000, 'b--', 'LineWidth', 2, 'DisplayName', 'Mean Polynomial Fit');
-fill([velocity_results.r_fine / constants.machine.a; flipud(velocity_results.r_fine / constants.machine.a)], [velocity_results.poly_fit_ci_lower / 1000; flipud(velocity_results.poly_fit_ci_upper / 1000)], 'b', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', '95% Confidence Interval');
-plot(velocity_results.r_fine / constants.machine.a, velocity_results.bessel_fit / 1000, 'r-', 'LineWidth', 2, 'DisplayName', 'Fourier-Bessel Fit');
+plot(r_norm, velocity_results.poly_fit_avg / 1000, 'g--', 'LineWidth', 2.5, 'DisplayName', '5th-order polynomial fit');
+fill([r_norm; flipud(r_norm)], [velocity_results.poly_fit_ci_lower / 1000; flipud(velocity_results.poly_fit_ci_upper / 1000)], 'g', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', '95% Confidence interval');
+plot(r_norm, velocity_results.bessel_fit / 1000, 'r-', 'LineWidth', 2, 'DisplayName', 'Fourier-Bessel series fit');
 xlabel('Normalised Radius (r/a)'); ylabel('Toroidal Velocity, V_{\phi} (km/s)');
-title('Velocity Profile Analysis Results'); legend('show', 'Location', 'best');
+title('Velocity Profile Analysis'); xlim([0, 1]); legend('show', 'Location', 'best');
 hold off;
 
-% Figure 2: Ion Temperature Profile Verification
-% ... (código do plot de temperatura) ...
-figure('Name', 'Ion Temperature Analysis Verification');
+% --- Figure 2: Ion Temperature Profile (Matches Thesis Fig. 3.6) ---
+figure('Name', 'Ion Temperature Profile Analysis');
 hold on; grid on; box on;
-errorbar(exp_data.r_Ti_exp / constants.machine.a, exp_data.Ti_reconstructed_exp, exp_data.Ti_reconstructed_err_exp, 'ko', 'MarkerFaceColor', 'k', 'DisplayName', 'Reconstructed Data');
-plot(temperature_results.r_fine / constants.machine.a, temperature_results.profile_avg, 'r-', 'LineWidth', 2.5, 'DisplayName', 'Mean Canonical Fit');
-fill([temperature_results.r_fine / constants.machine.a; flipud(temperature_results.r_fine / constants.machine.a)], [temperature_results.profile_ci_lower; flipud(temperature_results.profile_ci_upper)], 'r', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', '95% Confidence Band');
+errorbar(exp_data.r_Ti_exp / constants.machine.a, exp_data.Ti_reconstructed_exp, exp_data.Ti_reconstructed_err_exp, 'ko', 'MarkerFaceColor', 'k', 'DisplayName', 'Experimental Data');
+plot(r_norm, temperature_results.profile_avg, 'r-', 'LineWidth', 2.5, 'DisplayName', 'Canonical fit');
+fill([r_norm; flipud(r_norm)], [temperature_results.profile_ci_lower; flipud(temperature_results.profile_ci_upper)], 'r', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', '95% Confidence Band');
 xlabel('Normalised Radius (r/a)'); ylabel('Ion Temperature, T_{i} (eV)');
-title('Ion Temperature Profile Analysis Results'); legend('show', 'Location', 'best'); xlim([0, 1]);
+title('Ion Temperature Profile Analysis'); xlim([0, 1]); legend('show', 'Location', 'best');
 hold off;
 
-% Figure 3: Magnetic Field Profile Verification
-figure('Name', 'Magnetic Field Profile Verification');
+% --- Figure 3: Thermal Velocity Profiles (Matches Thesis Fig. B.2) ---
+figure('Name', 'Thermal Velocity Profiles');
 hold on; grid on; box on;
-plot(magnetic_field.r_fine / constants.machine.a, magnetic_field.total, 'k-', 'LineWidth', 2, 'DisplayName', 'B_{total}');
-plot(magnetic_field.r_fine / constants.machine.a, magnetic_field.toroidal, 'b--', 'LineWidth', 2, 'DisplayName', 'B_{toroidal}');
-plot(magnetic_field.r_fine / constants.machine.a, magnetic_field.poloidal, 'r-.', 'LineWidth', 2, 'DisplayName', 'B_{poloidal}');
+yyaxis left;
+plot(r_norm, derived_profiles.v_th_e, '-', 'LineWidth', 2);
+ylabel('Electron Thermal Velocity, v_{th,e} (m/s)');
+ylim([0, 2e7]);
+ax = gca; ax.YColor = [0 0.4470 0.7410];
+yyaxis right;
+plot(r_norm, derived_profiles.v_th_i, '-', 'LineWidth', 2);
+ylabel('Ion Thermal Velocity, v_{th,i} (m/s)');
+ylim([0, 3e5]);
+ax = gca; ax.YColor = [0.8500 0.3250 0.0980];
 xlabel('Normalised Radius (r/a)');
-ylabel('Magnetic Field (T)');
-title('Magnetic Field Profiles');
-legend('show', 'Location', 'best');
+title('Thermal Velocity Profiles'); xlim([0, 1]);
 hold off;
+
+% --- Figure 4: Coulomb Logarithm Profiles (Matches Thesis Fig. B.3) ---
+figure('Name', 'Coulomb Logarithm Profiles');
+hold on; grid on; box on;
+plot(r_norm, derived_profiles.ln_lambda_ee, 'LineWidth', 2, 'DisplayName', '\lambda_{ee}');
+plot(r_norm, derived_profiles.ln_lambda_ei, 'LineWidth', 2, 'DisplayName', '\lambda_{ei}');
+plot(r_norm, derived_profiles.ln_lambda_ii, 'LineWidth', 2, 'DisplayName', '\lambda_{ii}');
+xlabel('Normalised Radius (r/a)'); ylabel('Coulomb Logarithm, \lambda = ln\Lambda');
+title('Coulomb Logarithm Profiles'); legend('show', 'Location', 'best'); xlim([0, 1]);
+hold off;
+
+% --- Figure 5: Collision Metrics (Matches Thesis Fig. B.4) ---
+figure('Name', 'Collision Metrics');
+subplot(2, 2, 1); hold on; grid on; box on; plot(r_norm, derived_profiles.tau_e_calc, '--'); plot(r_norm, derived_profiles.tau_e_15, '-'); plot(r_norm, derived_profiles.tau_e_17, '-.'); xlabel('r/a'); ylabel('\tau_e [s]'); title('Electron Collision Time'); legend('\tau_e (\lambda_{ei,calc})', '\tau_e (\lambda = 15)', '\tau_e (\lambda = 17)'); xlim([0, 1]);
+subplot(2, 2, 2); hold on; grid on; box on; plot(r_norm, derived_profiles.tau_i_calc, '--'); plot(r_norm, derived_profiles.tau_i_15, '-'); plot(r_norm, derived_profiles.tau_i_17, '-.'); xlabel('r/a'); ylabel('\tau_i [s]'); title('Ion Collision Time'); legend('\tau_i (\lambda_{ii,calc})', '\tau_i (\lambda = 15)', '\tau_i (\lambda = 17)'); xlim([0, 1]);
+subplot(2, 2, 3); hold on; grid on; box on; plot(r_norm, derived_profiles.nu_ei / 1e5, '-'); xlabel('r/a'); ylabel('\nu_e [\times10^5 s^{-1}]'); title('Electron Collision Frequency'); xlim([0, 1]);
+subplot(2, 2, 4); hold on; grid on; box on; plot(r_norm, derived_profiles.nu_i / 1e3, '-'); xlabel('r/a'); ylabel('\nu_i [\times10^3 s^{-1}]'); title('Ion Collision Frequency'); xlim([0, 1]);
+
+% --- Figure 6: Key Dimensionless Profiles (Matches Thesis Fig. B.5) ---
+figure('Name', 'Key Dimensionless Profiles');
+subplot(1, 2, 1); hold on; grid on; box on; plot(r_norm, derived_profiles.q_profile, 'b-', 'LineWidth', 2); plot(r_norm, derived_profiles.s_profile, 'r--', 'LineWidth', 2); xlabel('r/a'); ylabel('Value'); title('q and s Profiles'); legend('Safety Factor q', 'Magnetic Shear s'); xlim([0, 1]); ylim([0, 4]);
+subplot(1, 2, 2); hold on; grid on; box on; plot(r_norm, derived_profiles.nu_star_i, 'b-', 'LineWidth', 2); plot(r_norm, derived_profiles.nu_star_e, 'r--', 'LineWidth', 2); xlabel('r/a'); ylabel('Collisionality, \nu_*'); title('Collisionality Profiles'); legend('Ion Collisionality (\nu_*)', 'Electron Collisionality (\nu_*)'); xlim([0, 1]); ylim([0, 4]);
 
 fprintf('Script finished.\n');
