@@ -1,4 +1,5 @@
-function run_verification_plots(constants, exp_data, velocity_results, temperature_results, derived_profiles, theoretical_models, effective_diffusivity)
+function run_verification_plots(constants, exp_data, velocity_results, ...
+    temperature_results, derived_profiles, theoretical_models, effective_diffusivity_thesis, ~, ~)
 %RUN_VERIFICATION_PLOTS Generates all diagnostic and comparison plots.
 %   This function centralises all plotting routines to visualise the results
 %   from each stage of the main analysis script.
@@ -53,8 +54,8 @@ hold off;
 % --- Figure 5: Effective Momentum Diffusivity (Matches Thesis Fig. 3.8) ---
 figure('Name', 'Effective Momentum Diffusivity');
 hold on; grid on; box on;
-fill([r_norm; flipud(r_norm)], [effective_diffusivity.ci_lower; flipud(effective_diffusivity.ci_upper)], 'c', 'FaceAlpha', 0.3, 'EdgeColor', 'none', 'DisplayName', '95% Confidence Band');
-plot(r_norm, effective_diffusivity.profile_avg, 'b-', 'LineWidth', 2.5, 'DisplayName', 'Mean Effective Diffusivity');
+fill([r_norm; flipud(r_norm)], [effective_diffusivity_thesis.ci_lower; flipud(effective_diffusivity_thesis.ci_upper)], 'c', 'FaceAlpha', 0.3, 'EdgeColor', 'none', 'DisplayName', '95% Confidence Band');
+plot(r_norm, effective_diffusivity_thesis.profile_avg, 'b-', 'LineWidth', 2.5, 'DisplayName', 'Mean Effective Diffusivity');
 xlabel('Normalised Radius (r/a)');
 ylabel('Effective Diffusivity, \chi_{\phi}^{eff} [m^2/s]');
 title('Effective Momentum Diffusivity (Thesis Method)');
