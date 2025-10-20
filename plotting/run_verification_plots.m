@@ -59,7 +59,7 @@ plot(r_norm, effective_diffusivity_thesis.profile_avg, 'b-', 'LineWidth', 2.5, '
 xlabel('Normalised Radius (r/a)');
 ylabel('Effective Diffusivity, \chi_{\phi}^{eff} [m^2/s]');
 title('Effective Momentum Diffusivity (Thesis Method)');
-xlim([0, 1]); ylim([0, 25]);
+xlim([0, 1]); ylim([0, 10]);
 legend('show', 'Location', 'best');
 hold off;
 
