@@ -74,7 +74,7 @@ end
 %% 3) Compute charge-exchange rates with defensive checks -----------------
 
 fprintf('Max imaginary part in Ti: %.3e\n', max(abs(imag(all_ti_profiles(:)))));
-fprintf('Number of negative Ti: %d\n', sum(all_ti_profiles(:) < 0));
+fprintf('Number of negative Ti: %d\n', nnz(all_ti_profiles(:) < 0));
 
 fprintf('... calculating charge exchange rate coefficient\n');
 
