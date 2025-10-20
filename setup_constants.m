@@ -38,6 +38,7 @@ constants.plasma.kvPS = -1.83;                    % Pfirsch-Schlüter regime coe
 constants.analysis.num_radial_points = 1000;      % Number of points in the fine radial grid
 constants.analysis.num_zeros_bessel = 70;         % Number of Bessel zeros for the series fit
 constants.analysis.num_iterations = 5000;         % Number of iterations for bootstrap/Monte Carlo methods
+constants.analysis.generate_final_plots = true;
 
 % --- Model-Specific Parameters ---
 % Parameters for the Gaussian neutral density profile model (n_H0)
