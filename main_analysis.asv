@@ -1,6 +1,7 @@
 % =========================================================================
 % TCABR MOMENTUM ANALYSIS - MAIN SCRIPT
 % =========================================================================
+
 clc; clear; close all;
 fprintf('Initiating TCABR momentum analysis script...\n\n');
 
@@ -10,12 +11,9 @@ addpath('src', 'plotting', 'utils');
 constants = setup_constants();
 exp_data = load_experimental_data(constants);
 
-% --- Define the Single Source of Truth for the Radial Grid ---
-% All subsequent calculations will use this high-resolution grid from the data file.
 r_fine = exp_data.r_profiles;
 
 % --- STAGE 2: Profile Analyses ---
-% Pass the unified r_fine grid to all analysis functions.
 velocity_results = analyze_velocity_profile(exp_data, constants, r_fine);
 temperature_results = analyze_temperature_profile(exp_data, constants, r_fine);
 
@@ -26,9 +24,12 @@ derived_profiles = compute_derived_profiles(exp_data, temperature_results, magne
 % --- STAGE 4: Theoretical Model Calculations ---
 theoretical_models = compute_theoretical_models(temperature_results, magnetic_field, derived_profiles, constants);
 
+% --- STAGE 5: Neutral Density and Collision Calculations ---
+neutral_profile = compute_neutral_density_profile(r_fine, constants);
+collision_profiles = compute_collision_profiles(temperature_results, neutral_profile, r_fine);
 
-% --- Verification Step: Plotting All Key Profiles ---
-fprintf('Verification: Plotting all key analysis results...\n');
+% --- STAGE 6: Verification Step: Plotting All Key Profiles ---
+fprintf('Verification: Plotting all key analysis and model comparison results...\n');
 % The normalised radius is created here for plotting purposes ONLY.
 r_norm = r_fine / constants.machine.a;
 
@@ -91,5 +92,111 @@ r_norm = r_fine / constants.machine.a;
 % figure('Name', 'Key Dimensionless Profiles');
 % subplot(1, 2, 1); hold on; grid on; box on; plot(r_norm, derived_profiles.q_profile, 'b-', 'LineWidth', 2); plot(r_norm, derived_profiles.s_profile, 'r--', 'LineWidth', 2); xlabel('r/a'); ylabel('Value'); title('q and s Profiles'); legend('Safety Factor q', 'Magnetic Shear s'); xlim([0, 1]); ylim([0, 4]);
 % subplot(1, 2, 2); hold on; grid on; box on; plot(r_norm, derived_profiles.nu_star_i, 'b-', 'LineWidth', 2); plot(r_norm, derived_profiles.nu_star_e, 'r--', 'LineWidth', 2); xlabel('r/a'); ylabel('Collisionality, \nu_*'); title('Collisionality Profiles'); legend('Ion Collisionality (\nu_*)', 'Electron Collisionality (\nu_*)'); xlim([0, 1]); ylim([0, 4]);
+
+% --- Figure 7: Neutral and Collision Profiles (Matches Thesis Fig. 3.7 & 3.8 insets) ---
+figure('Name', 'Neutral and Collision Profiles');
+
+% Subplot 1: Neutral Density and CX Rate
+subplot(1, 2, 1);
+hold on; grid on; box on;
+yyaxis left;
+plot(r_norm, neutral_profile.n_H0 / 1e16, 'b-', 'LineWidth', 2);
+ylabel('Neutral Density, n_{H0} (\times10^{16} m^{-3})');
+ylim([0, 6]);
+ax = gca; ax.YColor = 'b';
+
+yyaxis right;
+cx_rate = collision_profiles.cx_rate;
+fill([r_norm; flipud(r_norm)], [cx_rate.ci_lower; flipud(cx_rate.ci_upper)], 'r', 'FaceAlpha', 0.2, 'EdgeColor', 'none');
+plot(r_norm, cx_rate.avg, 'r-', 'LineWidth', 2);
+ylabel('Reaction Rate Coefficient, <\sigma v>_{cx} [m^3/s]');
+title('Neutral Density & CX Rate');
+xlabel('Normalised Radius (r/a)');
+xlim([0, 1]);
+
+% Subplot 2: Ion-Neutral Collision Frequency
+subplot(1, 2, 2);
+hold on; grid on; box on;
+nu_iH0 = collision_profiles.nu_iH0;
+fill([r_norm; flipud(r_norm)], [nu_iH0.ci_lower / 1e3; flipud(nu_iH0.ci_upper / 1e3)], 'r', 'FaceAlpha', 0.2, 'EdgeColor', 'none');
+plot(r_norm, nu_iH0.avg / 1e3, 'r-', 'LineWidth', 2);
+xlabel('Normalised Radius (r/a)');
+ylabel('Collision Frequency, \nu_{iH0} (\times10^3 s^{-1})');
+title('Ion-Neutral Collision Frequency');
+xlim([0, 1]); ylim([0, 2]);
+
+% --- Figure A: Helander Model vs. Experiment (Matches Thesis Fig. 3.4) ---
+figure('Name', 'Helander Model Comparison');
+hold on; grid on; box on;
+% Plot experimental data and polynomial fit from velocity analysis
+h1 = errorbar(exp_data.r_Vphi_exp / constants.machine.a, ...
+    -exp_data.Vphi_exp, exp_data.Vphi_err_exp, ...
+    'ko', 'MarkerFaceColor', 'k', 'DisplayName', 'Experimental data');
+h2 = fill([r_norm; flipud(r_norm)], [-velocity_results.poly_fit_ci_lower / 1000; ...
+    -flipud(velocity_results.poly_fit_ci_upper / 1000)], ...
+    'g', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', ...
+    '95% Confidence interval');
+h3 = plot(r_norm, -velocity_results.poly_fit_avg / 1000, 'g--', 'LineWidth', 2.5, 'DisplayName', '5th-order polynomial fit');
+% Plot the Helander model prediction
+h4 = plot(r_norm, -theoretical_models.Vphi_Helander / 1000, 'r-', 'LineWidth', 2.5, 'DisplayName', 'Helander model');
+xlabel('Normalised Radius (r/a)');
+ylabel('Toroidal Velocity, V_{\phi} (km/s)');
+title('Comparison with Helander Model');
+legend([h1, h3, h2, h4], 'Location', 'best');
+xlim([0, 1]); ylim([-10, 30]);
+hold off;
+
+% --- Figure B: Solomon Model Profiles (Matches Thesis Fig. 3.9 & 3.10) ---
+figure('Name', 'Solomon Model Profiles');
+r_norm = r_fine / constants.machine.a;
+
+% Subplot 1: Momentum Diffusivity
+subplot(1, 2, 1);
+hold on; grid on; box on;
+
+% Isolate the data structure for the R/Ln ~ 6.1 case to ensure consistency
+chi_calc = theoretical_models.chi_phi_solo_Rln_calc;
+label_calc_val = theoretical_models.R_over_Ln_mid_value;
+label_calc_profile = sprintf('\\chi_{\\phi}^{(Solo)} (R/L_n \\approx %.1f)', label_calc_val);
+label_calc_fill = sprintf('Uncertainty (R/L_n \\approx %.1f)', label_calc_val);
+
+% Plot the uncertainty band for the R/Ln ~ 6.1 case using its own data
+fill([r_norm; flipud(r_norm)], [chi_calc.lower_bound; flipud(chi_calc.upper_bound)], ...
+    [0.8500 0.3250 0.0980], 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', label_calc_fill);
+
+% Plot the main profile line for the R/Ln ~ 6.1 case
+plot(r_norm, chi_calc.profile, 'r-', 'LineWidth', 2.5, 'DisplayName', label_calc_profile);
+
+% Plot profile for R/Ln = 2
+chi_2 = theoretical_models.chi_phi_solo_Rln2;
+h_line2 = plot(r_norm, chi_2.profile, 'b--', 'LineWidth', 2, 'DisplayName', '\chi_{\phi}^{(Solo)} (R/L_n = 2)');
+
+xlabel('Normalised Radius (r/a)');
+ylabel('Momentum Diffusivity, \chi_{\phi} [m^2/s]');
+title('Solomon Momentum Diffusivity');
+xlim([0, 1]); ylim([0, 25]);
+legend('show', 'Location', 'northwest');
+
+% Subplot 2: Pinch Velocity
+subplot(1, 2, 2);
+hold on; grid on; box on;
+v_pinch = theoretical_models.Vpinch_solo;
+fill([r_norm; flipud(r_norm)], [v_pinch.lower_bound; flipud(v_pinch.upper_bound)], [0 0.4470 0.7410], 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', 'Uncertainty');
+plot(r_norm, v_pinch.profile, 'b-', 'LineWidth', 2, 'DisplayName', 'V_{pinch}^{(Solo)}');
+xlabel('Normalised Radius (r/a)');
+ylabel('Pinch Velocity, V_{pinch} [m/s]');
+title('Solomon Pinch Velocity');
+xlim([0, 1]); ylim([-60, 0]);
+legend('show', 'Location', 'southwest');
+
+% --- Figure C: Neutral Density Profile (Matches Thesis Fig. 3.7) ---
+figure('Name', 'Neutral Density Profile');
+hold on; grid on; box on;
+plot(r_norm, neutral_profile.n_H0 / 1e16, 'LineWidth', 3);
+xlabel('Normalised Radius (r/a)');
+ylabel('Neutral Density, n_{H0} (\times10^{16} m^{-3})');
+title('Neutral Particle Density Profile');
+xlim([0, 1]); ylim([0, 6]);
+hold off;
 
 fprintf('Script finished.\n');

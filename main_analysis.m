@@ -24,10 +24,11 @@ derived_profiles = compute_derived_profiles(exp_data, temperature_results, magne
 % --- STAGE 4: Theoretical Model Calculations ---
 theoretical_models = compute_theoretical_models(temperature_results, magnetic_field, derived_profiles, constants);
 
-% --- STAGE 5: Neutral Density and Collision Profiles ---
+% --- STAGE 5: Neutral Density and Collision Calculations ---
 neutral_profile = compute_neutral_density_profile(r_fine, constants);
+collision_profiles = compute_collision_profiles(temperature_results, neutral_profile, r_fine);
 
-% --- Verification Step: Plotting All Key Profiles ---
+% --- STAGE 6: Verification Step: Plotting All Key Profiles ---
 fprintf('Verification: Plotting all key analysis and model comparison results...\n');
 % The normalised radius is created here for plotting purposes ONLY.
 r_norm = r_fine / constants.machine.a;
@@ -91,6 +92,38 @@ r_norm = r_fine / constants.machine.a;
 % figure('Name', 'Key Dimensionless Profiles');
 % subplot(1, 2, 1); hold on; grid on; box on; plot(r_norm, derived_profiles.q_profile, 'b-', 'LineWidth', 2); plot(r_norm, derived_profiles.s_profile, 'r--', 'LineWidth', 2); xlabel('r/a'); ylabel('Value'); title('q and s Profiles'); legend('Safety Factor q', 'Magnetic Shear s'); xlim([0, 1]); ylim([0, 4]);
 % subplot(1, 2, 2); hold on; grid on; box on; plot(r_norm, derived_profiles.nu_star_i, 'b-', 'LineWidth', 2); plot(r_norm, derived_profiles.nu_star_e, 'r--', 'LineWidth', 2); xlabel('r/a'); ylabel('Collisionality, \nu_*'); title('Collisionality Profiles'); legend('Ion Collisionality (\nu_*)', 'Electron Collisionality (\nu_*)'); xlim([0, 1]); ylim([0, 4]);
+
+% --- Figure 7: Neutral and Collision Profiles (Matches Thesis Fig. 3.7 & 3.8 insets) ---
+figure('Name', 'Neutral and Collision Profiles');
+
+% Subplot 1: Neutral Density and CX Rate
+subplot(1, 2, 1);
+hold on; grid on; box on;
+yyaxis left;
+plot(r_norm, neutral_profile.n_H0 / 1e16, 'b-', 'LineWidth', 2);
+ylabel('Neutral Density, n_{H0} (\times10^{16} m^{-3})');
+ylim([0, 6]);
+ax = gca; ax.YColor = 'b';
+
+yyaxis right;
+cx_rate = collision_profiles.cx_rate;
+fill([r_norm; flipud(r_norm)], [cx_rate.ci_lower; flipud(cx_rate.ci_upper)], 'r', 'FaceAlpha', 0.2, 'EdgeColor', 'none');
+plot(r_norm, cx_rate.avg, 'r-', 'LineWidth', 2);
+ylabel('Reaction Rate Coefficient, <\sigma v>_{cx} [m^3/s]');
+title('Neutral Density & CX Rate');
+xlabel('Normalised Radius (r/a)');
+xlim([0, 1]);
+
+% Subplot 2: Ion-Neutral Collision Frequency
+subplot(1, 2, 2);
+hold on; grid on; box on;
+nu_iH0 = collision_profiles.nu_iH0;
+fill([r_norm; flipud(r_norm)], [nu_iH0.ci_lower / 1e3; flipud(nu_iH0.ci_upper / 1e3)], 'r', 'FaceAlpha', 0.2, 'EdgeColor', 'none');
+plot(r_norm, nu_iH0.avg / 1e3, 'r-', 'LineWidth', 2);
+xlabel('Normalised Radius (r/a)');
+ylabel('Collision Frequency, \nu_{iH0} (\times10^3 s^{-1})');
+title('Ion-Neutral Collision Frequency');
+xlim([0, 1]); ylim([0, 2]);
 
 % --- Figure A: Helander Model vs. Experiment (Matches Thesis Fig. 3.4) ---
 figure('Name', 'Helander Model Comparison');
@@ -156,14 +189,14 @@ title('Solomon Pinch Velocity');
 xlim([0, 1]); ylim([-60, 0]);
 legend('show', 'Location', 'southwest');
 
-% --- Figure C: Neutral Density Profile (Matches Thesis Fig. 3.7) ---
-figure('Name', 'Neutral Density Profile');
-hold on; grid on; box on;
-plot(r_norm, neutral_profile.n_H0 / 1e16, 'LineWidth', 3);
-xlabel('Normalised Radius (r/a)');
-ylabel('Neutral Density, n_{H0} (\times10^{16} m^{-3})');
-title('Neutral Particle Density Profile');
-xlim([0, 1]); ylim([0, 6]);
-hold off;
+% % --- Figure C: Neutral Density Profile (Matches Thesis Fig. 3.7) ---
+% figure('Name', 'Neutral Density Profile');
+% hold on; grid on; box on;
+% plot(r_norm, neutral_profile.n_H0 / 1e16, 'LineWidth', 3);
+% xlabel('Normalised Radius (r/a)');
+% ylabel('Neutral Density, n_{H0} (\times10^{16} m^{-3})');
+% title('Neutral Particle Density Profile');
+% xlim([0, 1]); ylim([0, 6]);
+% hold off;
 
 fprintf('Script finished.\n');
