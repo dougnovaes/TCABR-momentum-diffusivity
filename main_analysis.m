@@ -1,7 +1,9 @@
 % =========================================================================
-% TCABR MOMENTUM ANALYSIS - MAIN SCRIPT (MODULAR & OPTIMISED)
+% TCABR MOMENTUM ANALYSIS - MAIN SCRIPT (MODULAR & CACHE-ENABLED)
 % =========================================================================
-% Modular, cache-based orchestrator with per-stage plotting and robust I/O.
+% This script orchestrates the full analysis pipeline for toroidal momentum
+% transport in the TCABR tokamak. It features a per-stage caching system
+% to avoid re-computation and a control panel for selective plotting.
 % =========================================================================
 
 clc; clear; close all;
@@ -9,14 +11,14 @@ fprintf('Initiating TCABR modular momentum analysis script...\n\n');
 
 addpath('src', 'plotting', 'utils');
 
-% Results directory
+% Create results directory if it doesn't exist
 results_dir = 'results';
 if ~exist(results_dir, 'dir'), mkdir(results_dir); end
 
 %% ---------------------- CONTROL PANEL -----------------------------------
-t = true; f = false;
+t = true; f = false; % Define boolean aliases for clarity
 
-% run_flags: true = force recompute stage; false = load if present
+% --- Calculation Flags (true = force recompute; false = load if exists) ---
 run_flags = struct( ...
     'setup_and_data',        f, ...
     'profile_analyses',      f, ...
@@ -27,37 +29,35 @@ run_flags = struct( ...
     'diffusivity_scaling',   f ...
 );
 
-% plot_flags: control which stage-specific plots are shown
+% --- Plotting Flags (true = show plots for this group) ---
 plot_flags = struct( ...
-    'stage1_setup', t, ...
-    'stage2_profiles',     f,  ...
-    'stage3_physics',      t, ...
-    'stage4_models',       t,  ...
-    'stage5_collisions',   t,  ...
-    'stage6_diffusivity',  t,  ...
-    'stage7_scalings',     t ...
+    'justification_and_fits',   t, ... % Set to TRUE to run the first plot group
+    'thesis_method_results',    f, ...
+    'supporting_profiles',      f, ...
+    'final_comparison',         f ...
 );
 
-% Behaviour: stop on critical error?
-stop_on_error = true;
+% --- Behaviour ---
+stop_on_error = true; % Stop script execution if a calculation stage fails
 
-%% ---------------------- STAGE 1: Setup & Data ----------------------------
+%% ========================================================================
+%  --- EXECUTION PIPELINE (Calculations) ---
+% =========================================================================
+
+%% --- STAGE 1: Setup & Data ---
 try
     [constants, exp_data, r_fine] = load_or_compute( ...
         fullfile(results_dir, 'stage1_setup_data.mat'), ...
         run_flags.setup_and_data, ...
-        @() stage1_setup_and_data(), ...
+        @stage1_setup_and_data, ...
         {'constants', 'exp_data', 'r_fine'} ...
     );
-    if plot_flags.stage1_setup
-        try plot_stage1_setup(constants, exp_data, r_fine); catch ME, warning(ME.identifier, 'Plot stage1 failed: %s', ME.message); end
-    end
 catch ME
-    fprintf('Stage1 failed: %s\n', ME.message);
+    fprintf('FATAL ERROR in Stage 1 (Setup & Data): %s\n', ME.message);
     if stop_on_error, rethrow(ME); end
 end
 
-%% ---------------------- STAGE 2: Profile Analyses ------------------------
+%% --- STAGE 2: Profile Analyses ---
 try
     [velocity_results, temperature_results] = load_or_compute( ...
         fullfile(results_dir, 'stage2_profiles.mat'), ...
@@ -65,15 +65,12 @@ try
         @() stage2_profiles(exp_data, constants, r_fine), ...
         {'velocity_results', 'temperature_results'} ...
     );
-    if plot_flags.stage2_profiles
-        try plot_stage2_profiles(exp_data, velocity_results, temperature_results, r_fine, constants); catch ME, warning(ME.identifier, 'Plot stage2 failed: %s', ME.message); end
-    end
 catch ME
-    fprintf('Stage2 failed: %s\n', ME.message);
+    fprintf('FATAL ERROR in Stage 2 (Profile Analyses): %s\n', ME.message);
     if stop_on_error, rethrow(ME); end
 end
 
-%% ---------------------- STAGE 3: Physics Profiles ------------------------
+%% --- STAGE 3: Physics Profiles ---
 try
     [magnetic_field, derived_profiles] = load_or_compute( ...
         fullfile(results_dir, 'stage3_physics.mat'), ...
@@ -81,15 +78,12 @@ try
         @() stage3_physics(exp_data, temperature_results, constants, r_fine), ...
         {'magnetic_field', 'derived_profiles'} ...
     );
-    if plot_flags.stage3_physics
-        try plot_stage3_physics(magnetic_field, derived_profiles, constants, r_fine); catch ME, warning(ME.identifier, 'Plot stage3 failed: %s', ME.message); end
-    end
 catch ME
-    fprintf('Stage3 failed: %s\n', ME.message);
+    fprintf('FATAL ERROR in Stage 3 (Physics Profiles): %s\n', ME.message);
     if stop_on_error, rethrow(ME); end
 end
 
-%% ---------------------- STAGE 4: Theoretical Models ---------------------
+%% --- STAGE 4: Theoretical Models ---
 try
     theoretical_models = load_or_compute( ...
         fullfile(results_dir, 'stage4_models.mat'), ...
@@ -97,15 +91,12 @@ try
         @() stage4_models(temperature_results, magnetic_field, derived_profiles, constants), ...
         {'theoretical_models'} ...
     );
-    if plot_flags.stage4_models
-        try plot_stage4_models(theoretical_models, derived_profiles, constants, r_fine); catch ME, warning(ME.identifier, 'Plot stage4 failed: %s', ME.message); end
-    end
 catch ME
-    fprintf('Stage4 failed: %s\n', ME.message);
+    fprintf('FATAL ERROR in Stage 4 (Theoretical Models): %s\n', ME.message);
     if stop_on_error, rethrow(ME); end
 end
 
-%% ---------------------- STAGE 5: Neutral & Collisions -------------------
+%% --- STAGE 5: Neutral & Collisions ---
 try
     [neutral_profile, collision_profiles] = load_or_compute( ...
         fullfile(results_dir, 'stage5_collisions.mat'), ...
@@ -113,15 +104,12 @@ try
         @() stage5_neutral_collision(r_fine, temperature_results, constants), ...
         {'neutral_profile', 'collision_profiles'} ...
     );
-    if plot_flags.stage5_collisions
-        try plot_stage5_collisions(neutral_profile, collision_profiles, r_fine, constants); catch ME, warning(ME.identifier, 'Plot stage5 failed: %s', ME.message); end
-    end
 catch ME
-    fprintf('Stage5 failed: %s\n', ME.message);
+    fprintf('FATAL ERROR in Stage 5 (Neutral & Collisions): %s\n', ME.message);
     if stop_on_error, rethrow(ME); end
 end
 
-%% ---------------------- STAGE 6: Effective Diffusivity (Thesis) --------
+%% --- STAGE 6: Effective Diffusivity (Thesis Method) ---
 try
     effective_diffusivity_thesis = load_or_compute( ...
         fullfile(results_dir, 'stage6_diffusivity_thesis.mat'), ...
@@ -129,15 +117,12 @@ try
         @() stage6_diffusivity_thesis(velocity_results, collision_profiles, r_fine), ...
         {'effective_diffusivity_thesis'} ...
     );
-    if plot_flags.stage6_diffusivity
-        try plot_stage6_diffusivity(effective_diffusivity_thesis, r_fine, constants); catch ME, warning(ME.identifier, 'Plot stage6 failed: %s', ME.message); end
-    end
 catch ME
-    fprintf('Stage6 failed: %s\n', ME.message);
+    fprintf('FATAL ERROR in Stage 6 (Thesis Diffusivity): %s\n', ME.message);
     if stop_on_error, rethrow(ME); end
 end
 
-%% ---------------------- STAGE 7: Effective Diffusivity (Scaling) -------
+%% --- STAGE 7: Effective Diffusivity (from Scaling Laws) ---
 try
     scaling_law_results = load_or_compute( ...
         fullfile(results_dir, 'stage7_diffusivity_scaling.mat'), ...
@@ -145,110 +130,59 @@ try
         @() stage7_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine), ...
         {'scaling_law_results'} ...
     );
-    if plot_flags.stage7_scalings
-        try plot_stage7_scalings(scaling_law_results, r_fine, constants); catch ME, warning(ME.identifier, 'Plot stage7 failed: %s', ME.message); end
-    end
 catch ME
-    fprintf('Stage7 failed: %s\n', ME.message);
+    fprintf('FATAL ERROR in Stage 7 (Scaling Law Diffusivity): %s\n', ME.message);
     if stop_on_error, rethrow(ME); end
 end
 
-fprintf('\nAll requested stages processed.\n\n');
+fprintf('\nAll calculation stages processed successfully.\n\n');
 
-%% ---------------------- FINAL: Comparison Plot --------------------------
-% Always optional — call only when results exist
-if exist('effective_diffusivity_thesis', 'var') && exist('scaling_law_results', 'var')
+%% ========================================================================
+%  --- PLOTTING STAGE ---
+% =========================================================================
+fprintf('--- Generating Selected Plots ---\n');
+
+if plot_flags.justification_and_fits
     try
-        plot_diffusivity_comparison(effective_diffusivity_thesis, scaling_law_results, constants, r_fine);
+        plot_stage1_justification_and_fits(constants, exp_data, velocity_results, temperature_results, theoretical_models, r_fine);
     catch ME
-        warning(ME.identifier, 'Final comparison plot failed: %s', ME.message);
+        warning(ME.identifier,'Plotting failed for "Justification & Fits": %s', ME.message);
     end
 end
 
-fprintf('Script finished.\n');
+% Placeholder for future plot groups
+% if plot_flags.thesis_method_results
+%     ...
+% end
 
-%% =======================================================================
-%% ------------------ load_or_compute helper (optimised) ------------------
-%% =======================================================================
+fprintf('\nScript finished.\n');
+
+%% ========================================================================
+%  --- HELPER AND WRAPPER FUNCTIONS ---
+% =========================================================================
+
 function varargout = load_or_compute(filepath, force_recalc, compute_func, out_names)
-% LOAD_OR_COMPUTE  Load cached results or compute and save them.
-% Usage:
-%   [a,b,...] = load_or_compute(filepath, force_recalc, @() compute(), {'a','b',...})
-%
-% If out_names is provided, the saved .mat will contain those variable names.
-% The function returns as many outputs as the caller expects.
-
-if nargin < 2 || isempty(force_recalc), force_recalc = false; end
-if nargin < 3, error('load_or_compute requires (filepath, force_recalc, compute_func).'); end
-if nargin < 4, out_names = {}; end
-
-% Normalise filepath
-if isstring(filepath), filepath = char(filepath); end
-[dirpath, fname, fext] = fileparts(filepath);
-if isempty(fext), filepath = [filepath '.mat']; fext = '.mat'; end
-if ~isempty(dirpath) && ~exist(dirpath, 'dir'), mkdir(dirpath); end
-
-% Decide load or compute
-if exist(filepath, 'file') && ~force_recalc
-    S = load(filepath);
-    fields = fieldnames(S);
-    nout = nargout;
-    % If out_names provided and exist in file, return in that order
-    if ~isempty(out_names) && all(ismember(out_names, fields))
-        for k = 1:nout
+    if exist(filepath, 'file') && ~force_recalc
+        fprintf('Loading cached results from: %s\n', filepath);
+        S = load(filepath);
+        varargout = cell(1, nargout);
+        for k = 1:nargout
             varargout{k} = S.(out_names{k});
         end
-    else
-        % fallback: try canonical 'out1..outN'
-        canonical = arrayfun(@(k) sprintf('out%d', k), 1:nout, 'UniformOutput', false);
-        if all(ismember(canonical, fields))
-            for k = 1:nout
-                varargout{k} = S.(canonical{k});
-            end
-        else
-            % final fallback: return first nout fields (warn)
-            if numel(fields) < nout
-                error('File %s contains %d fields but %d outputs requested.', filepath, numel(fields), nout);
-            end
-            for k = 1:nout
-                varargout{k} = S.(fields{k});
-            end
-            warning('Loaded %s: returning first %d fields (%s). Consider re-saving with explicit out_names.', filepath, nout, strjoin(fields(1:nout), ', '));
-        end
+        return;
     end
-    fprintf('Loaded cached results: %s\n', filepath);
-    return;
-end
-
-% Compute
-fprintf('Computing stage: %s\n', [fname fext]);
-[varargout{1:nargout}] = compute_func();
-
-% Prepare struct for saving
-S = struct();
-if ~isempty(out_names) && numel(out_names) >= nargout
+    
+    fprintf('Computing and saving results to: %s\n', filepath);
+    [varargout{1:nargout}] = compute_func();
+    
+    S = struct();
     for k = 1:nargout
-        name = out_names{k};
-        S.(name) = varargout{k};
+        S.(out_names{k}) = varargout{k};
     end
-else
-    for k = 1:nargout
-        S.(sprintf('out%d', k)) = varargout{k};
-    end
-end
-
-% Save
-try
     save(filepath, '-struct', 'S');
-    fprintf('Saved results: %s\n', filepath);
-catch ME
-    warning('Failed to save %s: %s', filepath, ME.message);
-end
 end
 
-%% =======================================================================
-%% ------------------------ Stage wrappers (unchanged) ---------------------
-%% =======================================================================
+% --- Stage Wrapper Functions ---
 function [constants, exp_data, r_fine] = stage1_setup_and_data()
     constants = setup_constants();
     exp_data = load_experimental_data(constants);
