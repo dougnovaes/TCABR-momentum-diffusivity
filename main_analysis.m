@@ -1,6 +1,7 @@
 % =========================================================================
 % TCABR MOMENTUM ANALYSIS - MAIN SCRIPT
 % =========================================================================
+
 clc; clear; close all;
 fprintf('Initiating TCABR momentum analysis script...\n\n');
 
@@ -10,12 +11,9 @@ addpath('src', 'plotting', 'utils');
 constants = setup_constants();
 exp_data = load_experimental_data(constants);
 
-% --- Define the Single Source of Truth for the Radial Grid ---
-% All subsequent calculations will use this high-resolution grid from the data file.
 r_fine = exp_data.r_profiles;
 
 % --- STAGE 2: Profile Analyses ---
-% Pass the unified r_fine grid to all analysis functions.
 velocity_results = analyze_velocity_profile(exp_data, constants, r_fine);
 temperature_results = analyze_temperature_profile(exp_data, constants, r_fine);
 
@@ -26,9 +24,11 @@ derived_profiles = compute_derived_profiles(exp_data, temperature_results, magne
 % --- STAGE 4: Theoretical Model Calculations ---
 theoretical_models = compute_theoretical_models(temperature_results, magnetic_field, derived_profiles, constants);
 
+% --- STAGE 5: Neutral Density and Collision Profiles ---
+neutral_profile = compute_neutral_density_profile(r_fine, constants);
 
 % --- Verification Step: Plotting All Key Profiles ---
-fprintf('Verification: Plotting all key analysis results...\n');
+fprintf('Verification: Plotting all key analysis and model comparison results...\n');
 % The normalised radius is created here for plotting purposes ONLY.
 r_norm = r_fine / constants.machine.a;
 
@@ -113,7 +113,7 @@ legend([h1, h3, h2, h4], 'Location', 'best');
 xlim([0, 1]); ylim([-10, 30]);
 hold off;
 
-%% --- Figure B: Solomon Model Profiles (Matches Thesis Fig. 3.9 & 3.10) ---
+% --- Figure B: Solomon Model Profiles (Matches Thesis Fig. 3.9 & 3.10) ---
 figure('Name', 'Solomon Model Profiles');
 r_norm = r_fine / constants.machine.a;
 
@@ -155,5 +155,15 @@ ylabel('Pinch Velocity, V_{pinch} [m/s]');
 title('Solomon Pinch Velocity');
 xlim([0, 1]); ylim([-60, 0]);
 legend('show', 'Location', 'southwest');
+
+% --- Figure C: Neutral Density Profile (Matches Thesis Fig. 3.7) ---
+figure('Name', 'Neutral Density Profile');
+hold on; grid on; box on;
+plot(r_norm, neutral_profile.n_H0 / 1e16, 'LineWidth', 3);
+xlabel('Normalised Radius (r/a)');
+ylabel('Neutral Density, n_{H0} (\times10^{16} m^{-3})');
+title('Neutral Particle Density Profile');
+xlim([0, 1]); ylim([0, 6]);
+hold off;
 
 fprintf('Script finished.\n');

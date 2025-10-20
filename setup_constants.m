@@ -39,6 +39,14 @@ constants.analysis.num_radial_points = 1000;      % Number of points in the fine
 constants.analysis.num_zeros_bessel = 70;         % Number of Bessel zeros for the series fit
 constants.analysis.num_iterations = 5000;         % Number of iterations for bootstrap/Monte Carlo methods
 
+% --- Model-Specific Parameters ---
+% Parameters for the Gaussian neutral density profile model (n_H0)
+% Based on thesis section 3.4, referencing Kantor et al. (2007, 2012) and Severo et al. (2021).
+constants.models.neutrals.n_H0_centre = 2e15;       % Density at the centre [m^-3] [cite: 320]
+constants.models.neutrals.n_H0_max_amp = 5e16;      % Maximum amplitude of the Gaussian peak [m^-3] [cite: 352]
+constants.models.neutrals.r_max_H_alpha = 0.16;     % Radial position of max H-alpha emission [m]
+constants.models.neutrals.width = 0.04;           % Gaussian width (penetration depth) [m] [cite: 353]
+
 % --- File Paths ---
 constants.data.filename = 'experimental_profiles.txt';
 constants.data.path = fullfile('data', constants.data.filename);
