@@ -11,7 +11,7 @@ function set_publication_style(ax)
 %       ax - The axes handle to be styled (e.g., from gca).
 
     set(ax, ...
-        'FontSize', 28, ...                         % Set main font size for labels
+        'FontSize', 24, ...                         % Set main font size for labels
         'TickLabelInterpreter', 'latex', ...          % Render tick labels using LaTeX
         'XMinorTick', 'on', ...                       % Enable minor ticks on x-axis
         'YMinorTick', 'on', ...                       % Enable minor ticks on y-axis

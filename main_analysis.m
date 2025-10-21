@@ -20,17 +20,18 @@ t = true; f = false;
 run_flags = struct( ...
     'setup_and_data',        f, ...
     'profile_analyses',      f, ...
-    'physics_profiles',      f, ...
+    'physics_profiles',      f, ... % << Ensure this is false unless needed
     'theoretical_models',    f, ...
     'neutral_and_collision', f, ...
     'diffusivity_thesis',    f, ...
     'diffusivity_scaling',   f ...
 );
 
+% --- Plotting Flags (Updated Names) ---
 plot_flags = struct( ...
     'justification_and_fits', f, ...
-    'thesis_method_results',  t, ... % Set to TRUE to run this plot group
-    'supporting_profiles',    f, ...
+    'thesis_method_results',  f, ...
+    'supporting_profiles',    t, ... % << Set TRUE to run this group
     'final_comparison',       f ...
 );
 
@@ -100,13 +101,21 @@ fprintf('--- Generating Selected Plots ---\n');
 if plot_flags.justification_and_fits
     try
         plot_stage1_justification_and_fits(constants, exp_data, velocity_results, temperature_results, theoretical_models, r_fine);
-    catch ME, warning('Plotting failed for "Justification & Fits": %s', ME.message); end
+    catch ME, warning(ME.identifier,'Plotting failed for "Justification & Fits": %s', ME.message); end
 end
 
 if plot_flags.thesis_method_results
     try
         plot_stage2_thesis_method(constants, neutral_profile, collision_profiles, effective_diffusivity_thesis, r_fine);
-    catch ME, warning('Plotting failed for "Thesis Method Results": %s', ME.message); end
+    catch ME, warning(ME.identifier,'Plotting failed for "Thesis Method Results": %s', ME.message); end
+end
+
+if plot_flags.supporting_profiles
+    try
+        plot_stage3_supporting_profiles(constants, derived_profiles, r_fine);
+    catch ME
+        warning(ME.identifier,'Plotting failed for "Supporting Profiles": %s', ME.message);
+    end
 end
 
 fprintf('\nScript finished.\n');
