@@ -90,9 +90,11 @@ tau_e_15   = 1.09e16 .* (Te_mean./1000).^(3/2) ./ (ni_fine .* 15);
 tau_e_17   = 1.09e16 .* (Te_mean./1000).^(3/2) ./ (ni_fine .* 17);
 
 
-nu_i = 1 ./ tau_i_calc; % Ion-ion collision frequency [s^-1]
-nu_ei = 1 ./ tau_e_calc; % Electron-ion collision frequency [s^-1]
+nu_i_calc = 1 ./ tau_i_calc; % Ion-ion collision frequency [s^-1]
+nu_ei_calc = 1 ./ tau_e_calc; % Electron-ion collision frequency [s^-1]
 
+nu_i_15 = 1 ./ tau_i_15; % Ion-ion collision frequency [s^-1]
+nu_ei_15 = 1 ./ tau_e_15; % Electron-ion collision frequency [s^-1]
 
 % --- 5. Collisionality (nu_*) ---
 % This is the standard definition of collisionality, as defined in WESSON (14.12 Bootstrap current, p.739).
@@ -110,8 +112,8 @@ omega_bounce_i = sqrt(epsilon) .* v_th_i ./ (q_profile .* R_coord);
 omega_bounce_e = sqrt(epsilon) .* v_th_e ./ (q_profile .* R_coord);
 
 % Collisionality (dimensionless)
-nu_star_i = nu_i ./ (epsilon .* omega_bounce_i);
-nu_star_e = nu_ei ./ (epsilon .* omega_bounce_e);
+nu_star_i = nu_i_15 ./ (epsilon .* omega_bounce_i);
+nu_star_e = nu_ei_15 ./ (epsilon .* omega_bounce_e);
 
 
 % --- 6. Normalised Density Gradient (R/Ln) ---
@@ -135,8 +137,10 @@ derived_profiles.tau_e_17 = tau_e_17;         % <-- ADICIONADO
 derived_profiles.tau_i_calc = tau_i_calc;     % <-- ADICIONADO
 derived_profiles.tau_i_15 = tau_i_15;         % <-- ADICIONADO
 derived_profiles.tau_i_17 = tau_i_17;         % <-- ADICIONADO
-derived_profiles.nu_i       = nu_i;
-derived_profiles.nu_ei      = nu_ei;
+derived_profiles.nu_i_calc  = nu_i_calc;
+derived_profiles.nu_ei_calc = nu_ei_calc;
+derived_profiles.nu_i_15    = nu_i_15;
+derived_profiles.nu_ei_15   = nu_ei_15;
 derived_profiles.nu_star_i  = nu_star_i;
 derived_profiles.nu_star_e  = nu_star_e;
 derived_profiles.R_over_Ln  = R_over_Ln;

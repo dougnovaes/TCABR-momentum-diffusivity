@@ -100,11 +100,20 @@ hold(ax2b, 'off');
 % Subplot (c): Electron Collision Frequency
 ax2c = subplot(2, 2, 3);
 hold(ax2c, 'on'); grid(ax2c, 'on'); box(ax2c, 'on');
-plot(ax2c, r_norm, derived_profiles.nu_ei / 1e5, '-', 'LineWidth', 4.5, 'DisplayName', '$\nu_{ei} (\lambda=15)$', 'Color', default_colors(2,:));
-plot(ax2c, r_norm, (1./derived_profiles.tau_e_calc) / 1e5, '--', 'LineWidth', 3.5, 'DisplayName', '$\nu_{ei} (\lambda_{ei,calc})$', 'Color', default_colors(1,:)); % Plot calc version too
+
+% Use the frequencies computed directly and those derived from tau (calc)
+% Ensure fields exist, otherwise skip gracefully
+if isfield(derived_profiles, 'nu_ei_15')
+    plot(ax2c, r_norm, derived_profiles.nu_ei_15 / 1e5, '-', 'LineWidth', 3.5, 'DisplayName', '$\nu_{e} (\lambda = 15)$', 'Color', default_colors(2,:));
+end
+% plot the 'calculated' version: 1./tau_e_calc (if present)
+if isfield(derived_profiles, 'tau_e_calc')
+    plot(ax2c, r_norm, (1 ./ derived_profiles.tau_e_calc) / 1e5, '--', 'LineWidth', 3, 'DisplayName', '$\nu_{e} (\lambda_{ei,calc})$', 'Color', default_colors(1,:));
+end
+
 xlabel(ax2c, '$r/a$', 'Interpreter', 'latex');
 ylabel(ax2c, '$\nu_e$ [$\times10^5$ s$^{-1}$]', 'Interpreter', 'latex');
-title(ax2c, '(c) Electron Collision Frequency'); xlim(ax2c, [0, 1]); ylim(ax2c, [0, 6]); % Match thesis scale
+title(ax2c, '(c) Electron Collision Frequency'); xlim(ax2c, [0, 1]); ylim(ax2c, [0, 6]); % adjust if required
 legend(ax2c, 'show', 'Location', 'best');
 set_publication_style(ax2c);
 hold(ax2c, 'off');
@@ -112,13 +121,22 @@ hold(ax2c, 'off');
 % Subplot (d): Ion Collision Frequency
 ax2d = subplot(2, 2, 4);
 hold(ax2d, 'on'); grid(ax2d, 'on'); box(ax2d, 'on');
-plot(ax2d, r_norm, derived_profiles.nu_i / 1e3, '-', 'LineWidth', 4.5, 'DisplayName', '$\nu_i (\lambda=15)$', 'Color', default_colors(2,:)); % Assuming nu_i uses tau_i_15
-plot(ax2d, r_norm, (1./derived_profiles.tau_i_calc) / 1e3, '--', 'LineWidth', 3.5, 'DisplayName', '$\nu_i (\lambda_{ii,calc})$', 'Color', default_colors(1,:)); % Plot calc version too
+
+% Plot nu_i for lambda = 15 if available (use nu_i_15)
+if isfield(derived_profiles, 'nu_i_15')
+    plot(ax2d, r_norm, derived_profiles.nu_i_15 / 1e3, '-', 'LineWidth', 3.5, 'DisplayName', '$\nu_{i} (\lambda = 15)$', 'Color', default_colors(2,:));
+end
+% Plot calculated nu_i from tau_i_calc (1./tau_i_calc)
+if isfield(derived_profiles, 'tau_i_calc')
+    plot(ax2d, r_norm, (1 ./ derived_profiles.tau_i_calc) / 1e3, '--', 'LineWidth', 3, 'DisplayName', '$\nu_{i} (\lambda_{ii,calc})$', 'Color', default_colors(1,:));
+end
+
 xlabel(ax2d, '$r/a$', 'Interpreter', 'latex');
 ylabel(ax2d, '$\nu_i$ [$\times10^3$ s$^{-1}$]', 'Interpreter', 'latex');
-title(ax2d, '(d) Ion Collision Frequency'); xlim(ax2d, [0, 1]); ylim(ax2d, [0, 16]); % Match thesis scale
+title(ax2d, '(d) Ion Collision Frequency'); xlim(ax2d, [0, 1]); ylim(ax2d, [0, 16]); % adjust if required
 legend(ax2d, 'show', 'Location', 'best');
 set_publication_style(ax2d);
 hold(ax2d, 'off');
+
 
 end
