@@ -54,8 +54,8 @@ xlim([0 1]);
 set(gca,'FontSize',12);
 
 % Save figure
-save_dir = fullfile('results','plots');
-if ~exist(save_dir,'dir'), mkdir(save_dir); end
-saveas(gcf, fullfile(save_dir,'stage4_final_comparison_simple.png'));
+% save_dir = fullfile('results','plots');
+% if ~exist(save_dir,'dir'), mkdir(save_dir); end
+% saveas(gcf, fullfile(save_dir,'stage4_final_comparison_simple.png'));
 
 end

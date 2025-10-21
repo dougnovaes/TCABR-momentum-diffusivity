@@ -18,7 +18,7 @@ if ~exist(results_dir, 'dir'), mkdir(results_dir); end
 t = true; f = false;
 
 run_flags = struct( ...
-    'setup_and_data',        f, ...
+    'setup_and_data',        t, ...
     'profile_analyses',      f, ...
     'physics_profiles',      t, ...
     'theoretical_models',    t, ...
@@ -91,6 +91,22 @@ try
         @() stage7_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine), {'scaling_law_results'});
 catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
 
+% --- Compute theoretical chi_eff variants (R0 vs R_local, mid vs profile) ---
+try
+    % compute variants (returns struct with fields .chi_eff_R0_mid, etc.)
+    variants = compute_chi_eff_variants(scaling_law_results, velocity_results, derived_profiles, constants, r_fine);
+    % save variants into stage7 file for reproducibility (append)
+    try
+        save(fullfile(results_dir, 'stage7_diffusivity_scaling.mat'), 'variants', '-append');
+    catch
+        warning('Could not append variants to stage7 file.');
+    end
+catch ME
+    warning('compute_chi_eff_variants failed: %s', ME.message);
+    variants = [];
+end
+
+
 fprintf('\nAll calculation stages processed successfully.\n\n');
 
 %% ========================================================================
@@ -120,11 +136,19 @@ end
 
 if plot_flags.final_comparison
     try
-        plot_stage4_final_comparison(effective_diffusivity_thesis, scaling_law_results, constants, r_fine);
+        % Use the precomputed variants; fall back gracefully if missing
+        if exist('variants','var') && ~isempty(variants)
+            plot_chi_eff_comparison(effective_diffusivity_thesis, variants, scaling_law_results, constants);
+        else
+            % If variants missing, compute on-the-fly (best-effort)
+            variants = compute_chi_eff_variants(scaling_law_results, velocity_results, derived_profiles, constants, r_fine);
+            plot_chi_eff_comparison(effective_diffusivity_thesis, variants, scaling_law_results, constants);
+        end
     catch ME
         warning(ME.identifier,'Plotting failed for "Final comparison": %s', ME.message);
     end
 end
+
 
 fprintf('\nScript finished.\n');
 

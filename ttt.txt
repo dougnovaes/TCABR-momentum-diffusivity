@@ -1,0 +1,8 @@
+Quero que você compare a minha difusividade efetiva com a teórica prevista na eq. (3.14) da tese e que se encontra nos artigos. Percebi que não faz sentido comparar a difusividade efetiva com as difusividades puras das leis de escala, mas sim com as efetivas da eq. (3.14) construídas a partir das leis de escala. No entanto, como há espaço para investigação sobre qual raio as teorias usam, isso permite explorar as combinações e compará-las ao meu resultado. Ademais, como meus parâmetros de ajuste da gaussiana para o perfil de partículas neutras beira ao especulativo, apesar das referências, alterei os parâmetros para: 
+% Based on fitting to scaling laws
+constants.models.neutrals.n_H0_centre = 1e15;       % Density at the centre [m^-3] [cite: 320]
+constants.models.neutrals.n_H0_max_amp = 2e16;      % Maximum amplitude of the Gaussian peak [m^-3] [cite: 352]
+constants.models.neutrals.r_max_H_alpha = 0.1564;     % Radial position of max H-alpha emission [m]
+constants.models.neutrals.width = 0.022;           % Gaussian width (penetration depth) [m] [cite: 353]
+
+Isso fez minha difusividade efetiva se aproximar muito, muito mesmo, da efetiva teórica calculada do modo como está na função plot_stage4_final_comparison atual.
