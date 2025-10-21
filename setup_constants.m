@@ -49,10 +49,10 @@ constants.analysis.generate_final_plots = true;
 % constants.models.neutrals.width = 0.04;           % Gaussian width (penetration depth) [m] [cite: 353]
 
 % Based on fitting to scaling laws
-constants.models.neutrals.n_H0_centre = 1e15;       % Density at the centre [m^-3] [cite: 320]
-constants.models.neutrals.n_H0_max_amp = 2.2e16;      % Maximum amplitude of the Gaussian peak [m^-3] [cite: 352]
-constants.models.neutrals.r_max_H_alpha = 0.1564;     % Radial position of max H-alpha emission [m]
-constants.models.neutrals.width = 0.022;           % Gaussian width (penetration depth) [m] [cite: 353]
+constants.models.neutrals.n_H0_centre = 1e15;       % Density at the centre [m^-3] 
+constants.models.neutrals.n_H0_max_amp = 2.2e16;    % Maximum amplitude of the Gaussian peak [m^-3] 
+constants.models.neutrals.r_max_H_alpha = 0.1564;   % Radial position of max H-alpha emission [m]
+constants.models.neutrals.width = 0.022;            % Gaussian width (penetration depth) [m] 
 
 % --- File Paths ---
 constants.data.filename = 'experimental_profiles.txt';

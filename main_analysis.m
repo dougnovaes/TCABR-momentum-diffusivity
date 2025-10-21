@@ -18,9 +18,9 @@ if ~exist(results_dir, 'dir'), mkdir(results_dir); end
 t = true; f = false;
 
 run_flags = struct( ...
-    'setup_and_data',        t, ...
+    'setup_and_data',        f, ...
     'profile_analyses',      f, ...
-    'physics_profiles',      t, ...
+    'physics_profiles',      f, ...
     'theoretical_models',    t, ...
     'neutral_and_collision', t, ...
     'diffusivity_thesis',    t, ...
@@ -102,10 +102,28 @@ try
         warning('Could not append variants to stage7 file.');
     end
 catch ME
-    warning('compute_chi_eff_variants failed: %s', ME.message);
+    warning(ME.identifier,'compute_chi_eff_variants failed: %s', ME.message);
     variants = [];
 end
 
+% -------------------------------------------------------------------------
+% Optional: run neutral-parameter scan to find best fit to chosen theory
+% -------------------------------------------------------------------------
+run_neutral_scan = true;   % set false to skip
+if run_neutral_scan
+    % choose theoretical variant to compare against (must exist in variants)
+    scaling_reference = 'chi_eff_Rlocal_profile'; % e.g. 'chi_eff_Rlocal_profile' or 'chi_eff_Solo'
+    % define scan ranges (tune these)
+    amps = linspace(5e15, 3e16, 20);    % neutral amplitude [m^-3]
+    widths = linspace(0.008, 0.04, 16); % gaussian width [m]
+    opts.plot_results = true;
+    opts.verbose = true;
+    opts.centre = constants.models.neutrals.r_max_H_alpha;
+    opts.n0_centre = constants.models.neutrals.n_H0_centre;
+    results_scan = scan_neutrals_fit(velocity_results, temperature_results, collision_profiles, ...
+        variants, scaling_reference, constants, r_fine, amps, widths, opts);
+    save(fullfile(results_dir, 'neutral_scan_results.mat'), 'results_scan');
+end
 
 fprintf('\nAll calculation stages processed successfully.\n\n');
 

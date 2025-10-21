@@ -91,6 +91,28 @@ try
         @() stage7_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine), {'scaling_law_results'});
 catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
 
+% --- Compute theoretical chi_eff variants (R0 vs R_local, mid vs profile) ---
+try
+    % compute variants (returns struct with fields .chi_eff_R0_mid, etc.)
+    variants = compute_chi_eff_variants(scaling_law_results, velocity_results, derived_profiles, constants, r_fine);
+    % save variants into stage7 file for reproducibility (append)
+    try
+        save(fullfile(results_dir, 'stage7_diffusivity_scaling.mat'), 'variants', '-append');
+    catch
+        warning('Could not append variants to stage7 file.');
+    end
+catch ME
+    warning(ME.identifier,'compute_chi_eff_variants failed: %s', ME.message);
+    variants = [];
+end
+
+% Run neutral scan to find best gaussian parameters (optional)
+amps = linspace(1e16, 3e16, 15);     % ajuste conforme interesse
+widths = linspace(0.01, 0.04, 12);   % ajuste conforme interesse
+opts.plot_results = true;
+results_scan = scan_neutrals_fit(velocity_results, temperature_results, collision_profiles, variants, 'chi_eff_Rlocal_profile', constants, r_fine, amps, widths, opts);
+% save scan results
+save(fullfile(results_dir,'neutral_scan_results.mat'), 'results_scan');
 
 
 fprintf('\nAll calculation stages processed successfully.\n\n');
@@ -122,11 +144,19 @@ end
 
 if plot_flags.final_comparison
     try
-        plot_stage4_final_comparison(effective_diffusivity_thesis, scaling_law_results, constants, r_fine);
+        % Use the precomputed variants; fall back gracefully if missing
+        if exist('variants','var') && ~isempty(variants)
+            plot_chi_eff_comparison(effective_diffusivity_thesis, variants, scaling_law_results, constants);
+        else
+            % If variants missing, compute on-the-fly (best-effort)
+            variants = compute_chi_eff_variants(scaling_law_results, velocity_results, derived_profiles, constants, r_fine);
+            plot_chi_eff_comparison(effective_diffusivity_thesis, variants, scaling_law_results, constants);
+        end
     catch ME
         warning(ME.identifier,'Plotting failed for "Final comparison": %s', ME.message);
     end
 end
+
 
 fprintf('\nScript finished.\n');
 
@@ -175,7 +205,7 @@ function [neutral_profile, collision_profiles] = stage5_neutral_collision(r_fine
     collision_profiles = compute_collision_profiles(temperature_results, neutral_profile, r_fine);
 end
 function effective_diffusivity_thesis = stage6_diffusivity_thesis(velocity_results, collision_profiles, r_fine)
-    effective_diffusivity_thesis = compute_effective_diffusivity(velocity_results, collision_profiles, r_fine);
+    effective_diffusivity_thesis = compute_diffusivity_profile(velocity_results, collision_profiles, r_fine);
 end
 function scaling_law_results = stage7_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine)
     scaling_law_results = compute_chi_eff_from_scalings(velocity_results, derived_profiles, constants, r_fine);
