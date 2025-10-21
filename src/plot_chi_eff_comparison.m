@@ -1,4 +1,4 @@
-function plot_chi_eff_comparison(effective_thesis, variants, scaling, constants)
+function plot_chi_eff_comparison(effective_thesis, variants, ~, constants)
 % single-axis overlay plot with shaded experimental band and theoretical curves
 
 a = constants.machine.a;
