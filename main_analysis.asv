@@ -1,299 +1,180 @@
 % =========================================================================
-% TCABR MOMENTUM ANALYSIS - MAIN SCRIPT (MODULAR VERSION)
+% TCABR MOMENTUM ANALYSIS - MAIN SCRIPT (MODULAR & CACHE-ENABLED)
 % =========================================================================
-% Modular and cache-based orchestrator for the analysis of toroidal
-% momentum transport in the TCABR tokamak.
-% Each stage saves and loads its own results independently.
+% This script orchestrates the full analysis pipeline for toroidal momentum
+% transport in the TCABR tokamak. It features a per-stage caching system
+% to avoid re-computation and a control panel for selective plotting.
 % =========================================================================
 
 clc; clear; close all;
 fprintf('Initiating TCABR modular momentum analysis script...\n\n');
 
 addpath('src', 'plotting', 'utils');
+
 results_dir = 'results';
 if ~exist(results_dir, 'dir'), mkdir(results_dir); end
 
-%% --- EXECUTION CONTROL PANEL --------------------------------------------
-% Define which stages to run or reload from cache.
-% true  -> force recalculation of that stage
-% false -> load from saved .mat if available
+%% ---------------------- CONTROL PANEL -----------------------------------
+t = true; f = false;
+
 run_flags = struct( ...
-    'setup_and_data',           true, ...
-    'profile_analyses',         true, ...
-    'physics_profiles',         true, ...
-    'theoretical_models',       true, ...
-    'neutral_and_collision',    true, ...
-    'diffusivity_thesis',       true, ...
-    'diffusivity_scaling',      true ...
+    'setup_and_data',        f, ...
+    'profile_analyses',      f, ...
+    'physics_profiles',      t, ...
+    'theoretical_models',    t, ...
+    'neutral_and_collision', t, ...
+    'diffusivity_thesis',    t, ...
+    'diffusivity_scaling',   t ...
 );
 
-%% --- STAGE 1: Setup and Data Loading -----------------------------------
-[constants, exp_data, r_fine] = load_or_compute( ...
-    fullfile(results_dir, 'stage1_setup_data.mat'), ...
-    run_flags.setup_and_data, ...
-    @() stage1_setup_and_data() ...
+% --- Plotting Flags (Updated Names) ---
+plot_flags = struct( ...
+    'justification_and_fits', f, ...
+    'thesis_method_results',  f, ...
+    'supporting_profiles',    f, ... 
+    'final_comparison',       t ...
 );
 
-%% --- STAGE 2: Profile Analyses -----------------------------------------
-[velocity_results, temperature_results] = load_or_compute( ...
-    fullfile(results_dir, 'stage2_profiles.mat'), ...
-    run_flags.profile_analyses, ...
-    @() stage2_profiles(exp_data, constants, r_fine) ...
-);
+stop_on_error = true;
 
-%% --- STAGE 3: Physics Profile Calculations ------------------------------
-[magnetic_field, derived_profiles] = load_or_compute( ...
-    fullfile(results_dir, 'stage3_physics.mat'), ...
-    run_flags.physics_profiles, ...
-    @() stage3_physics(exp_data, temperature_results, constants, r_fine) ...
-);
+%% ========================================================================
+%  --- EXECUTION PIPELINE (Calculations) ---
+% =========================================================================
+% (As seções de cálculo permanecem as mesmas das versões anteriores)
 
-%% --- STAGE 4: Theoretical Model Calculations ----------------------------
-theoretical_models = load_or_compute( ...
-    fullfile(results_dir, 'stage4_models.mat'), ...
-    run_flags.theoretical_models, ...
-    @() stage4_models(temperature_results, magnetic_field, derived_profiles, constants) ...
-);
-
-%% --- STAGE 5: Neutral Density and Collisions ----------------------------
-[neutral_profile, collision_profiles] = load_or_compute( ...
-    fullfile(results_dir, 'stage5_collisions.mat'), ...
-    run_flags.neutral_and_collision, ...
-    @() stage5_neutral_collision(r_fine, temperature_results, constants) ...
-);
-
-%% --- STAGE 6: Effective Diffusivity (Thesis Method) --------------------
-effective_diffusivity_thesis = load_or_compute( ...
-    fullfile(results_dir, 'stage6_diffusivity_thesis.mat'), ...
-    run_flags.diffusivity_thesis, ...
-    @() stage6_diffusivity_thesis(velocity_results, collision_profiles, r_fine) ...
-);
-
-%% --- STAGE 7: Effective Diffusivity (Scaling Laws) ---------------------
-scaling_law_results = load_or_compute( ...
-    fullfile(results_dir, 'stage7_diffusivity_scaling.mat'), ...
-    run_flags.diffusivity_scaling, ...
-    @() stage7_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine) ...
-);
-
-fprintf('\nAll calculations complete.\n\n');
-
-%% --- STAGE 8: Plotting -------------------------------------------------
-plot_diffusivity_comparison(effective_diffusivity_thesis, scaling_law_results, constants, r_fine);
-% run_verification_plots(...);
-
-fprintf('Script finished.\n');
-
-
-
-% ========================================================================
-% ======================== AUXILIARY FUNCTIONS ===========================
-% ========================================================================
-
-function varargout = load_or_compute(filepath, force_recalc, compute_func)
-% LOAD_OR_COMPUTE  Load cached results or compute-and-save.
-% Usage:
-%   [a,b,...] = load_or_compute(filepath, force_recalc, @() compute_stage());
-%
-% - filepath: full path to .mat file to load/save
-% - force_recalc: logical; if true, compute even if file exists
-% - compute_func: function handle that returns the outputs for this stage
-%
-% This function always returns as many outputs as the caller expects.
-
-if nargin < 2 || isempty(force_recalc)
-    force_recalc = false;
-end
-if nargin < 3
-    error('load_or_compute requires (filepath, force_recalc, compute_func).');
-end
-
-% Normalise filepath to char
-if isstring(filepath), filepath = char(filepath); end
-[~, fname, fext] = fileparts(filepath);
-if isempty(fext)
-    filepath = [filepath '.mat'];
-end
-
-% Decide: load or compute
-if exist(filepath, 'file') && ~force_recalc
-    try
-        S = load(filepath);
-    catch ME
-        error('Failed to load %s: %s', filepath, ME.message);
-    end
-
-    % If file contains out1...outN (our canonical save), return them in order.
-    outN = nargout;
-    outFields = fieldnames(S);
-    hasCanonical = all(arrayfun(@(k) ismember(sprintf('out%d', k), outFields), 1:outN));
-
-    if hasCanonical
-        for k = 1:outN
-            varargout{k} = S.(sprintf('out%d', k));
-        end
-    else
-        % Fallback: if number of fields equals requested outputs, return in field order
-        if numel(outFields) >= outN
-            for k = 1:outN
-                varargout{k} = S.(outFields{k});
-            end
-            warning('Loaded %s: fields returned in stored order (%s).', filepath, strjoin(outFields(1:outN), ', '));
-        else
-            error('File %s does not contain enough outputs (%d requested, %d available).', filepath, outN, numel(outFields));
-        end
-    end
-
-    fprintf('Loaded cached results: %s\n', filepath);
-    return;
-end
-
-% --- compute and save ---
-fprintf('Computing stage: %s\n', [fname '.mat']);
-[varargout{1:nargout}] = compute_func();
-
-% Prepare structure to save: canonical names out1,out2,...
-S = struct();
-for k = 1:nargout
-    S.(sprintf('out%d', k)) = varargout{k};
-end
-
-% Create directory if needed
-[outdir, ~, ~] = fileparts(filepath);
-if ~isempty(outdir) && ~exist(outdir, 'dir')
-    mkdir(outdir);
-end
-
+%% --- STAGE 1: Setup & Data ---
 try
+    [constants, exp_data, r_fine] = load_or_compute( ...
+        fullfile(results_dir, 'stage1_setup_data.mat'), run_flags.setup_and_data, ...
+        @stage1_setup_and_data, {'constants', 'exp_data', 'r_fine'});
+catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
+
+%% --- STAGE 2: Profile Analyses ---
+try
+    [velocity_results, temperature_results] = load_or_compute( ...
+        fullfile(results_dir, 'stage2_profiles.mat'), run_flags.profile_analyses, ...
+        @() stage2_profiles(exp_data, constants, r_fine), {'velocity_results', 'temperature_results'});
+catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
+
+%% --- STAGE 3: Physics Profiles ---
+try
+    [magnetic_field, derived_profiles] = load_or_compute( ...
+        fullfile(results_dir, 'stage3_physics.mat'), run_flags.physics_profiles, ...
+        @() stage3_physics(exp_data, temperature_results, constants, r_fine), {'magnetic_field', 'derived_profiles'});
+catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
+
+%% --- STAGE 4: Theoretical Models ---
+try
+    theoretical_models = load_or_compute( ...
+        fullfile(results_dir, 'stage4_models.mat'), run_flags.theoretical_models, ...
+        @() stage4_models(temperature_results, magnetic_field, derived_profiles, constants), {'theoretical_models'});
+catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
+
+%% --- STAGE 5: Neutral & Collisions ---
+try
+    [neutral_profile, collision_profiles] = load_or_compute( ...
+        fullfile(results_dir, 'stage5_collisions.mat'), run_flags.neutral_and_collision, ...
+        @() stage5_neutral_collision(r_fine, temperature_results, constants), {'neutral_profile', 'collision_profiles'});
+catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
+
+%% --- STAGE 6: Effective Diffusivity (Thesis Method) ---
+try
+    effective_diffusivity_thesis = load_or_compute( ...
+        fullfile(results_dir, 'stage6_diffusivity_thesis.mat'), run_flags.diffusivity_thesis, ...
+        @() stage6_diffusivity_thesis(velocity_results, collision_profiles, r_fine), {'effective_diffusivity_thesis'});
+catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
+
+%% --- STAGE 7: Effective Diffusivity (from Scaling Laws) ---
+try
+    scaling_law_results = load_or_compute( ...
+        fullfile(results_dir, 'stage7_diffusivity_scaling.mat'), run_flags.diffusivity_scaling, ...
+        @() stage7_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine), {'scaling_law_results'});
+catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
+
+fprintf('\nAll calculation stages processed successfully.\n\n');
+
+%% ========================================================================
+%  --- PLOTTING STAGE ---
+% =========================================================================
+fprintf('--- Generating Selected Plots ---\n');
+
+if plot_flags.justification_and_fits
+    try
+        plot_stage1_justification_and_fits(constants, exp_data, velocity_results, temperature_results, theoretical_models, r_fine);
+    catch ME, warning(ME.identifier,'Plotting failed for "Justification & Fits": %s', ME.message); end
+end
+
+if plot_flags.thesis_method_results
+    try
+        plot_stage2_thesis_method(constants, neutral_profile, collision_profiles, effective_diffusivity_thesis, r_fine);
+    catch ME, warning(ME.identifier,'Plotting failed for "Thesis Method Results": %s', ME.message); end
+end
+
+if plot_flags.supporting_profiles
+    try
+        plot_stage3_supporting_profiles(constants, derived_profiles, r_fine);
+    catch ME
+        warning(ME.identifier,'Plotting failed for "Supporting Profiles": %s', ME.message);
+    end
+end
+
+if plot_flags.final_comparison
+    try
+        plot_stage4_final_comparison(effective_diffusivity_thesis, scaling_law_results, constants, r_fine);
+    catch ME
+        warning(ME.identifier,'Plotting failed for "Final comparison": %s', ME.message);
+    end
+end
+
+fprintf('\nScript finished.\n');
+
+%% ========================================================================
+%  --- HELPER AND WRAPPER FUNCTIONS ---
+% =========================================================================
+% (As wrapper functions permanecem as mesmas)
+
+function varargout = load_or_compute(filepath, force_recalc, compute_func, out_names)
+    if exist(filepath, 'file') && ~force_recalc
+        fprintf('Loading cached results from: %s\n', filepath);
+        S = load(filepath);
+        varargout = cell(1, nargout);
+        for k = 1:nargout
+            varargout{k} = S.(out_names{k});
+        end
+        return;
+    end
+    fprintf('Computing and saving results to: %s\n', [fileparts(filepath), filesep, out_names{:}]);
+    [varargout{1:nargout}] = compute_func();
+    S = struct();
+    for k = 1:nargout
+        S.(out_names{k}) = varargout{k};
+    end
     save(filepath, '-struct', 'S');
-    fprintf('Saved results: %s\n', filepath);
-catch ME
-    warning('Failed to save results to %s: %s', filepath, ME.message);
 end
-end
-
-function names = get_output_names(n)
-    % Default output names to avoid empty fieldnames
-    names = arrayfun(@(k) sprintf('out%d', k), 1:n, 'UniformOutput', false);
-end
-
-
-% ========================================================================
-% ===================== STAGE FUNCTION WRAPPERS ==========================
-% ========================================================================
 
 function [constants, exp_data, r_fine] = stage1_setup_and_data()
     constants = setup_constants();
     exp_data = load_experimental_data(constants);
     r_fine = exp_data.r_profiles;
 end
-
 function [velocity_results, temperature_results] = stage2_profiles(exp_data, constants, r_fine)
     velocity_results = analyze_velocity_profile(exp_data, constants, r_fine);
     temperature_results = analyze_temperature_profile(exp_data, constants, r_fine);
 end
-
 function [magnetic_field, derived_profiles] = stage3_physics(exp_data, temperature_results, constants, r_fine)
     magnetic_field = compute_magnetic_field(r_fine, constants);
     derived_profiles = compute_derived_profiles(exp_data, temperature_results, magnetic_field, constants, r_fine);
 end
-
 function theoretical_models = stage4_models(temperature_results, magnetic_field, derived_profiles, constants)
     theoretical_models = compute_theoretical_models(temperature_results, magnetic_field, derived_profiles, constants);
 end
-
 function [neutral_profile, collision_profiles] = stage5_neutral_collision(r_fine, temperature_results, constants)
     neutral_profile = compute_neutral_density_profile(r_fine, constants);
     collision_profiles = compute_collision_profiles(temperature_results, neutral_profile, r_fine);
 end
-
 function effective_diffusivity_thesis = stage6_diffusivity_thesis(velocity_results, collision_profiles, r_fine)
     effective_diffusivity_thesis = compute_effective_diffusivity(velocity_results, collision_profiles, r_fine);
 end
-
 function scaling_law_results = stage7_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine)
     scaling_law_results = compute_chi_eff_from_scalings(velocity_results, derived_profiles, constants, r_fine);
 end
-
-
-
-% % =========================================================================
-% % TCABR MOMENTUM ANALYSIS - MAIN SCRIPT
-% % =========================================================================
-% % This script serves as the main orchestrator for the analysis of toroidal
-% % momentum transport in the TCABR tokamak. It executes all calculation
-% % stages sequentially and then calls a separate script to generate plots.
-% %
-% % It includes a caching system to avoid re-running expensive calculations.
-% % =========================================================================
-% 
-% clc; clear; close all;
-% fprintf('Initiating TCABR momentum analysis script...\n\n');
-% 
-% addpath('src', 'plotting', 'utils');
-% 
-% %% --- SCRIPT CONTROL ---
-% % Set this flag to 'true' to force the script to run all calculations from
-% % scratch, even if a results file exists. Set to 'false' to load existing
-% % results and skip calculations.
-% force_recalculation = true;
-% 
-% % Define the path for the saved results file
-% results_filepath = fullfile('results', 'full_analysis_results.mat');
-% 
-% 
-% %% --- EXECUTION STAGES ---
-% % Check if results should be loaded or recalculated
-% if isfile(results_filepath) && ~force_recalculation
-%     % --- LOAD PRE-COMPUTED RESULTS ---
-%     fprintf('Found existing results file. Loading pre-computed data...\n');
-%     load(results_filepath);
-%     fprintf('Results loaded successfully.\n\n');
-% 
-% else
-%     % --- RUN ALL CALCULATION STAGES ---
-%     fprintf('Running all calculation stages from scratch...\n\n');
-% 
-%     % --- STAGE 1: Setup and Data Loading ---
-%     constants = setup_constants();
-%     exp_data = load_experimental_data(constants);
-%     r_fine = exp_data.r_profiles;
-% 
-%     % --- STAGE 2: Profile Analyses ---
-%     velocity_results = analyze_velocity_profile(exp_data, constants, r_fine);
-%     temperature_results = analyze_temperature_profile(exp_data, constants, r_fine);
-% 
-%     % --- STAGE 3: Physics Profile Calculations ---
-%     magnetic_field = compute_magnetic_field(r_fine, constants);
-%     derived_profiles = compute_derived_profiles(exp_data, temperature_results, magnetic_field, constants, r_fine);
-% 
-%     % --- STAGE 4: Theoretical Model Calculations ---
-%     theoretical_models = compute_theoretical_models(temperature_results, magnetic_field, derived_profiles, constants);
-% 
-%     % --- STAGE 5: Neutral Density and Collision Calculations ---
-%     neutral_profile = compute_neutral_density_profile(r_fine, constants);
-%     collision_profiles = compute_collision_profiles(temperature_results, neutral_profile, r_fine);
-% 
-%     % --- STAGE 6: Effective Diffusivity Calculation (Thesis Method) ---
-%     effective_diffusivity_thesis = compute_effective_diffusivity(velocity_results, collision_profiles, r_fine);
-% 
-%     % --- STAGE 7: Effective Diffusivity Calculation (from Scaling Laws) ---
-%     scaling_law_results = compute_chi_eff_from_scalings(velocity_results, derived_profiles, constants, r_fine);
-% 
-%     fprintf('\nAll calculations complete.\n');
-% 
-%     % --- SAVE RESULTS TO FILE ---
-%     fprintf('Saving all results to %s for future runs...\n', results_filepath);
-%     save(results_filepath, 'constants', 'exp_data', 'r_fine', ...
-%         'velocity_results', 'temperature_results', 'magnetic_field', ...
-%         'derived_profiles', 'theoretical_models', 'neutral_profile', ...
-%         'collision_profiles', 'effective_diffusivity_thesis', 'scaling_law_results');
-%     fprintf('Save complete.\n\n');
-% end
-% 
-% % --- STAGE 8: Plotting ---
-% % This stage always runs, using either the newly calculated or loaded results.
-% plot_diffusivity_comparison(effective_diffusivity_thesis, scaling_law_results, constants, r_fine);
-% % run_verification_plots(...); % You can uncomment this to see all plots
-% 
-% fprintf('Script finished.\n');
