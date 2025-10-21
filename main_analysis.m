@@ -114,14 +114,17 @@ if run_neutral_scan
     % choose theoretical variant to compare against (must exist in variants)
     scaling_reference = 'chi_eff_Rlocal_profile'; % e.g. 'chi_eff_Rlocal_profile' or 'chi_eff_Solo'
     % define scan ranges (tune these)
-    amps = linspace(5e15, 3e16, 20);    % neutral amplitude [m^-3]
-    widths = linspace(0.008, 0.04, 16); % gaussian width [m]
+    amps = linspace(5e15, 3e16, 10);    % neutral amplitude [m^-3]
+    widths = linspace(0.008, 0.04, 10); % gaussian width [m]
+    r0s = linspace(0.14, 0.18, 5); % in metres
     opts.plot_results = true;
     opts.verbose = true;
     opts.centre = constants.models.neutrals.r_max_H_alpha;
     opts.n0_centre = constants.models.neutrals.n_H0_centre;
+    % results_scan = scan_neutrals_fit(velocity_results, temperature_results, collision_profiles, ...
+    %     variants, scaling_reference, constants, r_fine, amps, widths, opts);
     results_scan = scan_neutrals_fit(velocity_results, temperature_results, collision_profiles, ...
-        variants, scaling_reference, constants, r_fine, amps, widths, opts);
+        scaling_law_results, 'chi_eff_Peeters_Rln_calc', constants, r_fine, amps, widths, r0s, opts);
     save(fullfile(results_dir, 'neutral_scan_results.mat'), 'results_scan');
 end
 
