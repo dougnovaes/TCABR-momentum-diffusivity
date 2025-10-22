@@ -177,7 +177,7 @@ try
         warning('Could not append ''variants'' to stage7 file; proceeding without saving.');
     end
 catch ME
-    warning('compute_chi_eff_variants failed: %s', ME.message);
+    warning(ME.identifier, 'compute_chi_eff_variants failed: %s', ME.message);
     variants = [];
 end
 
@@ -215,7 +215,7 @@ if plot_flags.justification_and_fits
     try
         plot_stage1_justification_and_fits(constants, exp_data, velocity_results, temperature_results, theoretical_models, r_fine);
     catch ME
-        warning('plot_stage1_justification_and_fits failed: %s', ME.message);
+        warning(ME.identifier, 'plot_stage1_justification_and_fits failed: %s', ME.message);
     end
 end
 
@@ -223,7 +223,7 @@ if plot_flags.thesis_method_results
     try
         plot_stage2_thesis_method(constants, neutral_profile, collision_profiles, effective_diffusivity_thesis, r_fine);
     catch ME
-        warning('plot_stage2_thesis_method failed: %s', ME.message);
+        warning(ME.identifier, 'plot_stage2_thesis_method failed: %s', ME.message);
     end
 end
 
@@ -231,7 +231,7 @@ if plot_flags.supporting_profiles
     try
         plot_stage3_supporting_profiles(constants, derived_profiles, r_fine);
     catch ME
-        warning('plot_stage3_supporting_profiles failed: %s', ME.message);
+        warning(ME.identifier, 'plot_stage3_supporting_profiles failed: %s', ME.message);
     end
 end
 
@@ -243,7 +243,7 @@ if plot_flags.final_comparison
         % call the single-axis comparison plot
         plot_chi_eff_comparison(effective_diffusivity_thesis, variants, scaling_law_results, constants);
     catch ME
-        warning('plot_chi_eff_comparison failed: %s', ME.message);
+        warning(ME.identifier, 'plot_chi_eff_comparison failed: %s', ME.message);
     end
 end
 
@@ -269,7 +269,7 @@ function varargout = load_or_compute(filepath, force_recalc, compute_func, out_n
     if nargin < 4, out_names = {}; end
 
     % Normalise filename
-    [p,f,e] = fileparts(filepath);
+    [p,~,e] = fileparts(filepath);
     if isempty(e), filepath = [filepath '.mat']; end
     if ~isempty(p) && ~exist(p,'dir'), mkdir(p); end
 

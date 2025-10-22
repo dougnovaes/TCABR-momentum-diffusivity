@@ -1,4 +1,4 @@
-function plot_chi_eff_comparison(diffusivity_results, variants, scaling_law_results, constants, varargin)
+function plot_chi_eff_comparison(diffusivity_results, variants, ~, constants, varargin)
 % PLOT_CHI_EFF_COMPARISON Plot experimental chi_eff and multiple theoretical variants.
 %   plot_chi_eff_comparison(diffusivity_results, variants, scaling_law_results, constants)
 %
@@ -16,7 +16,7 @@ figure('Name','χ_φ,eff: Experimental vs Theoretical','Color','w','Position',[1
 hold on; grid on; box on;
 
 % Experimental
-h_exp = plot(r_norm, diffusivity_results.profile_avg, '-o', 'LineWidth', 2, 'MarkerSize', 4, 'Color', colors(1,:));
+plot(r_norm, diffusivity_results.profile_avg, '-o', 'LineWidth', 2, 'MarkerSize', 4, 'Color', colors(1,:));
 if isfield(diffusivity_results,'ci_lower') && isfield(diffusivity_results,'ci_upper')
     fill([r_norm; flipud(r_norm)], [diffusivity_results.ci_lower; flipud(diffusivity_results.ci_upper)], ...
         colors(1,:), 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'HandleVisibility','off');
