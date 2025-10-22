@@ -1,225 +1,354 @@
+% main_analysis.m
 % =========================================================================
-% TCABR MOMENTUM ANALYSIS - MAIN SCRIPT (MODULAR & CACHE-ENABLED)
+% TCABR MOMENTUM ANALYSIS - MAIN (MODULAR & CACHE-ENABLED)
 % =========================================================================
-% This script orchestrates the full analysis pipeline for toroidal momentum
-% transport in the TCABR tokamak. It features a per-stage caching system
-% to avoid re-computation and a control panel for selective plotting.
+% Orchestrates the calculation and plotting pipeline for toroidal momentum
+% transport analysis. The script:
+%  - is modular: stages 1..7 saved to 'results/' as .mat files (per-stage cache)
+%  - separates compute and plotting flows (compute-only, plot-only flags)
+%  - includes variants generation for theoretical chi_eff and comparison plotting
+%  - designed for MATLAB R2025b
 % =========================================================================
 
 clc; clear; close all;
 fprintf('Initiating TCABR modular momentum analysis script...\n\n');
 
+% Add source and plotting paths (adjust if your layout differs)
 addpath('src', 'plotting', 'utils');
 
+% Results directory
 results_dir = 'results';
 if ~exist(results_dir, 'dir'), mkdir(results_dir); end
+plots_dir = fullfile(results_dir,'plots');
+if ~exist(plots_dir,'dir'), mkdir(plots_dir); end
 
-%% ---------------------- CONTROL PANEL -----------------------------------
-t = true; f = false;
-
+% ------------------------- CONTROL PANEL ---------------------------------
+% Set these flags before running:
+% run_flags: if true, stage is forced to recompute; if false, attempt to load saved .mat
 run_flags = struct( ...
-    'setup_and_data',        f, ...
-    'profile_analyses',      f, ...
-    'physics_profiles',      f, ...
-    'theoretical_models',    f, ...
-    'neutral_and_collision', f, ...
-    'diffusivity_thesis',    f, ...
-    'diffusivity_scaling',   f ...
+    'setup_and_data',        false, ...
+    'profile_analyses',      false, ...
+    'physics_profiles',      false, ...
+    'theoretical_models',    false, ...
+    'neutral_and_collision', false, ...
+    'diffusivity_thesis',    false, ...
+    'diffusivity_scaling',   false ...
 );
 
-% --- Plotting Flags (Updated Names) ---
+% plot_flags: choose which plot groups to produce
 plot_flags = struct( ...
-    'justification_and_fits', t, ...
-    'thesis_method_results',  t, ...
-    'supporting_profiles',    t, ... 
-    'final_comparison',       t ...
+    'justification_and_fits', true, ...
+    'thesis_method_results',  true, ...
+    'supporting_profiles',    true, ...
+    'final_comparison',       true ...
 );
 
+% control for optional neutral-scan
+run_neutral_scan = false;
+
+% behaviour on error
 stop_on_error = true;
 
-%% ========================================================================
-%  --- EXECUTION PIPELINE (Calculations) ---
-% =========================================================================
-% (As seções de cálculo permanecem as mesmas das versões anteriores)
+% ---------------------- END CONTROL PANEL --------------------------------
 
-%% --- STAGE 1: Setup & Data ---
+%% ------------------------------------------------------------------------
+% STAGE 1: Setup & Data
+% - expected outputs: constants, exp_data, r_fine
+%% ------------------------------------------------------------------------
 try
     [constants, exp_data, r_fine] = load_or_compute( ...
-        fullfile(results_dir, 'stage1_setup_data.mat'), run_flags.setup_and_data, ...
-        @stage1_setup_and_data, {'constants', 'exp_data', 'r_fine'});
-catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
+        fullfile(results_dir,'stage1_setup_data.mat'), ...
+        run_flags.setup_and_data, ...
+        @stage1_setup_and_data, ...
+        {'constants','exp_data','r_fine'} ...
+    );
+catch ME
+    fprintf('Stage1 error: %s\n', ME.message);
+    if stop_on_error, rethrow(ME); end
+end
 
-%% --- STAGE 2: Profile Analyses ---
+%% ------------------------------------------------------------------------
+% STAGE 2: Profile Analyses
+% - expected outputs: velocity_results, temperature_results
+%% ------------------------------------------------------------------------
 try
     [velocity_results, temperature_results] = load_or_compute( ...
-        fullfile(results_dir, 'stage2_profiles.mat'), run_flags.profile_analyses, ...
-        @() stage2_profiles(exp_data, constants, r_fine), {'velocity_results', 'temperature_results'});
-catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
+        fullfile(results_dir,'stage2_profiles.mat'), ...
+        run_flags.profile_analyses, ...
+        @() stage2_profiles(exp_data, constants, r_fine), ...
+        {'velocity_results','temperature_results'} ...
+    );
+catch ME
+    fprintf('Stage2 error: %s\n', ME.message);
+    if stop_on_error, rethrow(ME); end
+end
 
-%% --- STAGE 3: Physics Profiles ---
+%% ------------------------------------------------------------------------
+% STAGE 3: Physics Profiles
+% - expected outputs: magnetic_field, derived_profiles
+%% ------------------------------------------------------------------------
 try
     [magnetic_field, derived_profiles] = load_or_compute( ...
-        fullfile(results_dir, 'stage3_physics.mat'), run_flags.physics_profiles, ...
-        @() stage3_physics(exp_data, temperature_results, constants, r_fine), {'magnetic_field', 'derived_profiles'});
-catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
+        fullfile(results_dir,'stage3_physics.mat'), ...
+        run_flags.physics_profiles, ...
+        @() stage3_physics(exp_data, temperature_results, constants, r_fine), ...
+        {'magnetic_field','derived_profiles'} ...
+    );
+catch ME
+    fprintf('Stage3 error: %s\n', ME.message);
+    if stop_on_error, rethrow(ME); end
+end
 
-%% --- STAGE 4: Theoretical Models ---
+%% ------------------------------------------------------------------------
+% STAGE 4: Theoretical Models
+% - expected outputs: theoretical_models
+%% ------------------------------------------------------------------------
 try
     theoretical_models = load_or_compute( ...
-        fullfile(results_dir, 'stage4_models.mat'), run_flags.theoretical_models, ...
-        @() stage4_models(temperature_results, magnetic_field, derived_profiles, constants), {'theoretical_models'});
-catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
+        fullfile(results_dir,'stage4_models.mat'), ...
+        run_flags.theoretical_models, ...
+        @() stage4_models(temperature_results, magnetic_field, derived_profiles, constants), ...
+        {'theoretical_models'} ...
+    );
+catch ME
+    fprintf('Stage4 error: %s\n', ME.message);
+    if stop_on_error, rethrow(ME); end
+end
 
-%% --- STAGE 5: Neutral & Collisions ---
+%% ------------------------------------------------------------------------
+% STAGE 5: Neutral & Collisions
+% - expected outputs: neutral_profile, collision_profiles
+%% ------------------------------------------------------------------------
 try
     [neutral_profile, collision_profiles] = load_or_compute( ...
-        fullfile(results_dir, 'stage5_collisions.mat'), run_flags.neutral_and_collision, ...
-        @() stage5_neutral_collision(r_fine, temperature_results, constants), {'neutral_profile', 'collision_profiles'});
-catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
+        fullfile(results_dir,'stage5_collisions.mat'), ...
+        run_flags.neutral_and_collision, ...
+        @() stage5_neutral_collision(r_fine, temperature_results, constants), ...
+        {'neutral_profile','collision_profiles'} ...
+    );
+catch ME
+    fprintf('Stage5 error: %s\n', ME.message);
+    if stop_on_error, rethrow(ME); end
+end
 
-%% --- STAGE 6: Effective Diffusivity (Thesis Method) ---
+%% ------------------------------------------------------------------------
+% STAGE 6: Effective Diffusivity (thesis method)
+% - expected output: effective_diffusivity_thesis
+%% ------------------------------------------------------------------------
 try
     effective_diffusivity_thesis = load_or_compute( ...
-        fullfile(results_dir, 'stage6_diffusivity_thesis.mat'), run_flags.diffusivity_thesis, ...
-        @() stage6_diffusivity_thesis(velocity_results, collision_profiles, r_fine), {'effective_diffusivity_thesis'});
-catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
+        fullfile(results_dir,'stage6_diffusivity_thesis.mat'), ...
+        run_flags.diffusivity_thesis, ...
+        @() stage6_diffusivity_thesis(velocity_results, collision_profiles, r_fine), ...
+        {'effective_diffusivity_thesis'} ...
+    );
+catch ME
+    fprintf('Stage6 error: %s\n', ME.message);
+    if stop_on_error, rethrow(ME); end
+end
 
-%% --- STAGE 7: Effective Diffusivity (from Scaling Laws) ---
+%% ------------------------------------------------------------------------
+% STAGE 7: Effective Diffusivity from Scaling Laws
+% - expected output: scaling_law_results
+%% ------------------------------------------------------------------------
 try
     scaling_law_results = load_or_compute( ...
-        fullfile(results_dir, 'stage7_diffusivity_scaling.mat'), run_flags.diffusivity_scaling, ...
-        @() stage7_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine), {'scaling_law_results'});
-catch ME, if stop_on_error, rethrow(ME); else, warning(ME.message); end, end
+        fullfile(results_dir,'stage7_diffusivity_scaling.mat'), ...
+        run_flags.diffusivity_scaling, ...
+        @() stage7_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine), ...
+        {'scaling_law_results'} ...
+    );
+catch ME
+    fprintf('Stage7 error: %s\n', ME.message);
+    if stop_on_error, rethrow(ME); end
+end
 
-% --- Compute theoretical chi_eff variants (R0 vs R_local, mid vs profile) ---
+fprintf('\nAll calculation stages executed (or loaded) up to Stage 7.\n\n');
+
+%% ------------------------------------------------------------------------
+% Compute theoretical variants for chi_eff (R0 vs R_local, mid vs profile)
+% Save variants into the stage7 file for reproducibility.
+%% ------------------------------------------------------------------------
 try
-    % compute variants (returns struct with fields .chi_eff_R0_mid, etc.)
     variants = compute_chi_eff_variants(scaling_law_results, velocity_results, derived_profiles, constants, r_fine);
-    % save variants into stage7 file for reproducibility (append)
     try
-        save(fullfile(results_dir, 'stage7_diffusivity_scaling.mat'), 'variants', '-append');
+        save(fullfile(results_dir,'stage7_diffusivity_scaling.mat'),'variants','-append');
     catch
-        warning('Could not append variants to stage7 file.');
+        warning('Could not append ''variants'' to stage7 file; proceeding without saving.');
     end
 catch ME
-    warning(ME.identifier,'compute_chi_eff_variants failed: %s', ME.message);
+    warning('compute_chi_eff_variants failed: %s', ME.message);
     variants = [];
 end
 
-% -------------------------------------------------------------------------
-% Optional: run neutral-parameter scan to find best fit to chosen theory
-% -------------------------------------------------------------------------
-run_neutral_scan = true;   % set false to skip
+%% ------------------------------------------------------------------------
+% Optional: neutral-parameters scan (find best Gaussian neutral profile).
+% This calls scan_neutrals_fit which uses compute_nu_iH0_from_nH0 and compute_diffusivity_profile.
+%% ------------------------------------------------------------------------
 if run_neutral_scan
-    % choose theoretical variant to compare against (must exist in variants)
-    scaling_reference = 'chi_eff_Rlocal_profile'; % e.g. 'chi_eff_Rlocal_profile' or 'chi_eff_Solo'
-    % define scan ranges (tune these)
-    amps = linspace(5e15, 3e16, 10);    % neutral amplitude [m^-3]
-    widths = linspace(0.008, 0.04, 10); % gaussian width [m]
-    r0s = linspace(0.14, 0.18, 5); % in metres
+    fprintf('Running neutral-parameter grid scan (this can be expensive)...\n');
+    % Define parameter ranges (tune as required)
+    amps = linspace(5e15,3e16,10);      % amplitude [m^-3]
+    widths = linspace(0.008,0.04,10);   % width [m]
+    r0s = linspace(constants.models.neutrals.r_max_H_alpha - 0.01, ...
+                   constants.models.neutrals.r_max_H_alpha + 0.01, 5);
+    opts = struct();
     opts.plot_results = true;
     opts.verbose = true;
-    opts.centre = constants.models.neutrals.r_max_H_alpha;
     opts.n0_centre = constants.models.neutrals.n_H0_centre;
-    % results_scan = scan_neutrals_fit(velocity_results, temperature_results, collision_profiles, ...
-    %     variants, scaling_reference, constants, r_fine, amps, widths, opts);
+    % choose theory reference field name available in 'variants' or 'scaling_law_results'
+    scaling_reference = 'chi_eff_Peeters_Rln_calc'; % example
+    % run scan (this function must exist in utils/)
     results_scan = scan_neutrals_fit(velocity_results, temperature_results, collision_profiles, ...
-        scaling_law_results, 'chi_eff_Peeters_Rln_calc', constants, r_fine, amps, widths, r0s, opts);
-    save(fullfile(results_dir, 'neutral_scan_results.mat'), 'results_scan');
+        scaling_law_results, scaling_reference, constants, r_fine, amps, widths, r0s, opts);
+    save(fullfile(results_dir,'neutral_scan_results.mat'),'results_scan');
+    fprintf('Neutral scan saved to results/neutral_scan_results.mat\n');
 end
 
-fprintf('\nAll calculation stages processed successfully.\n\n');
-
-%% ========================================================================
-%  --- PLOTTING STAGE ---
-% =========================================================================
-fprintf('--- Generating Selected Plots ---\n');
+%% ------------------------------------------------------------------------
+% PLOTTING stage: use the plot flags to control which collections to draw.
+% All plotting functions are purely visual and may use already computed results.
+%% ------------------------------------------------------------------------
+fprintf('--- Generating selected plots ---\n');
 
 if plot_flags.justification_and_fits
     try
         plot_stage1_justification_and_fits(constants, exp_data, velocity_results, temperature_results, theoretical_models, r_fine);
-    catch ME, warning(ME.identifier,'Plotting failed for "Justification & Fits": %s', ME.message); end
+    catch ME
+        warning('plot_stage1_justification_and_fits failed: %s', ME.message);
+    end
 end
 
 if plot_flags.thesis_method_results
     try
         plot_stage2_thesis_method(constants, neutral_profile, collision_profiles, effective_diffusivity_thesis, r_fine);
-    catch ME, warning(ME.identifier,'Plotting failed for "Thesis Method Results": %s', ME.message); end
+    catch ME
+        warning('plot_stage2_thesis_method failed: %s', ME.message);
+    end
 end
 
 if plot_flags.supporting_profiles
     try
         plot_stage3_supporting_profiles(constants, derived_profiles, r_fine);
     catch ME
-        warning(ME.identifier,'Plotting failed for "Supporting Profiles": %s', ME.message);
+        warning('plot_stage3_supporting_profiles failed: %s', ME.message);
     end
 end
 
 if plot_flags.final_comparison
     try
-        % Use the precomputed variants; fall back gracefully if missing
-        if exist('variants','var') && ~isempty(variants)
-            plot_chi_eff_comparison(effective_diffusivity_thesis, variants, scaling_law_results, constants);
-        else
-            % If variants missing, compute on-the-fly (best-effort)
+        if isempty(variants)
             variants = compute_chi_eff_variants(scaling_law_results, velocity_results, derived_profiles, constants, r_fine);
-            plot_chi_eff_comparison(effective_diffusivity_thesis, variants, scaling_law_results, constants);
         end
+        % call the single-axis comparison plot
+        plot_chi_eff_comparison(effective_diffusivity_thesis, variants, scaling_law_results, constants);
     catch ME
-        warning(ME.identifier,'Plotting failed for "Final comparison": %s', ME.message);
+        warning('plot_chi_eff_comparison failed: %s', ME.message);
     end
 end
-
 
 fprintf('\nScript finished.\n');
 
 %% ========================================================================
-%  --- HELPER AND WRAPPER FUNCTIONS ---
-% =========================================================================
-% (As wrapper functions permanecem as mesmas)
+% Helper wrappers used in this main (kept local for convenience)
+% If you have your own implementations, remove these and use yours.
+%% ========================================================================
 
 function varargout = load_or_compute(filepath, force_recalc, compute_func, out_names)
-    if exist(filepath, 'file') && ~force_recalc
-        fprintf('Loading cached results from: %s\n', filepath);
+% LOAD_OR_COMPUTE Load a .mat file if present or execute compute_func and save results.
+% Inputs:
+%   filepath: full path to .mat
+%   force_recalc: logical, if true compute even if file exists
+%   compute_func: function handle returning as many outputs as out_names
+%   out_names: cell array of names to store in file (and return)
+%
+% Usage:
+%   [a,b] = load_or_compute('results/stageX.mat', false, @() compute_stage(), {'a','b'});
+    if isstring(filepath), filepath = char(filepath); end
+    if nargin < 2 || isempty(force_recalc), force_recalc = false; end
+    if nargin < 4, out_names = {}; end
+
+    % Normalise filename
+    [p,f,e] = fileparts(filepath);
+    if isempty(e), filepath = [filepath '.mat']; end
+    if ~isempty(p) && ~exist(p,'dir'), mkdir(p); end
+
+    if exist(filepath,'file') && ~force_recalc
         S = load(filepath);
-        varargout = cell(1, nargout);
-        for k = 1:nargout
-            varargout{k} = S.(out_names{k});
+        % If explicit out_names provided and present in file, return those
+        if ~isempty(out_names) && all(isfield(S,out_names))
+            for k = 1:numel(out_names)
+                varargout{k} = S.(out_names{k});
+            end
+        else
+            % fallback: return first nargout fields in file
+            fields = fieldnames(S);
+            nv = nargout;
+            if numel(fields) < nv
+                error('File %s contains %d fields but %d outputs requested.', filepath, numel(fields), nv);
+            end
+            for k = 1:nv
+                varargout{k} = S.(fields{k});
+            end
+            warning('Loaded %s: returning first %d stored fields.', filepath, nv);
         end
+        fprintf('Loaded cached results: %s\n', filepath);
         return;
     end
-    fprintf('Computing and saving results to: %s\n', [fileparts(filepath), filesep, out_names{:}]);
+
+    % Compute and save
+    fprintf('Computing and saving results to: %s\n', filepath);
     [varargout{1:nargout}] = compute_func();
     S = struct();
-    for k = 1:nargout
-        S.(out_names{k}) = varargout{k};
+    if ~isempty(out_names) && numel(out_names) >= nargout
+        for k = 1:nargout
+            S.(out_names{k}) = varargout{k};
+        end
+    else
+        for k = 1:nargout
+            S.(sprintf('out%d',k)) = varargout{k};
+        end
     end
-    save(filepath, '-struct', 'S');
+    try
+        save(filepath, '-struct','S');
+        fprintf('Saved results: %s\n', filepath);
+    catch ME
+        warning('Could not save %s: %s', filepath, ME.message);
+    end
 end
 
+% ---------------- Stage wrapper functions (thin) -------------------------
 function [constants, exp_data, r_fine] = stage1_setup_and_data()
     constants = setup_constants();
     exp_data = load_experimental_data(constants);
     r_fine = exp_data.r_profiles;
 end
+
 function [velocity_results, temperature_results] = stage2_profiles(exp_data, constants, r_fine)
     velocity_results = analyze_velocity_profile(exp_data, constants, r_fine);
     temperature_results = analyze_temperature_profile(exp_data, constants, r_fine);
 end
+
 function [magnetic_field, derived_profiles] = stage3_physics(exp_data, temperature_results, constants, r_fine)
     magnetic_field = compute_magnetic_field(r_fine, constants);
     derived_profiles = compute_derived_profiles(exp_data, temperature_results, magnetic_field, constants, r_fine);
 end
+
 function theoretical_models = stage4_models(temperature_results, magnetic_field, derived_profiles, constants)
     theoretical_models = compute_theoretical_models(temperature_results, magnetic_field, derived_profiles, constants);
 end
+
 function [neutral_profile, collision_profiles] = stage5_neutral_collision(r_fine, temperature_results, constants)
     neutral_profile = compute_neutral_density_profile(r_fine, constants);
     collision_profiles = compute_collision_profiles(temperature_results, neutral_profile, r_fine);
 end
+
 function effective_diffusivity_thesis = stage6_diffusivity_thesis(velocity_results, collision_profiles, r_fine)
     effective_diffusivity_thesis = compute_diffusivity_profile(velocity_results, collision_profiles, r_fine);
 end
+
 function scaling_law_results = stage7_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine)
     scaling_law_results = compute_chi_eff_from_scalings(velocity_results, derived_profiles, constants, r_fine);
 end
+
+% End of main_analysis.m
