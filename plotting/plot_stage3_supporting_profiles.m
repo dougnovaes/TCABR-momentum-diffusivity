@@ -6,6 +6,7 @@ function plot_stage3_supporting_profiles(constants, derived_profiles, r_fine, sa
 %   2. Collision Metrics: A 2x2 subplot figure replicating the layout of
 %      Thesis Figure B.4, showing (a) Electron Collision Time, (b) Ion
 %      Collision Time, (c) Electron Collision Frequency, and (d) Ion Collision Frequency.
+%   Creates two figures, each opening as a tab in a docked window.
 
     arguments
         constants (1,1) struct
@@ -19,7 +20,7 @@ function plot_stage3_supporting_profiles(constants, derived_profiles, r_fine, sa
     colors = get(groot, 'DefaultAxesColorOrder');
 
     % --- Figure 1: Fundamental and Dimensionless Quantities ---
-    fig1 = figure('Name', 'Fundamental and Dimensionless Profiles', 'Position', [100, 100, 1200, 900]);
+    fig1 = figure('Name', 'Stage 3: Fundamental Profiles', 'WindowStyle', 'docked');
     
     % Subplot (a): Thermal Velocities
     ax1a = subplot(2, 2, 1); hold(ax1a, 'on'); grid(ax1a, 'on'); box(ax1a, 'on');
@@ -59,7 +60,7 @@ function plot_stage3_supporting_profiles(constants, derived_profiles, r_fine, sa
     saveas(fig1, fullfile(save_dir, 'stage3_fundamental_profiles.png')); savefig(fig1, fullfile(save_dir, 'stage3_fundamental_profiles.fig'));
 
     % --- Figure 2: Collision Metrics (Recreates Thesis Fig B.4 Layout) ---
-    fig2 = figure('Name', 'Collision Metrics (Thesis Fig B.4 Layout)', 'Position', [150, 150, 1200, 900]);
+    fig2 = figure('Name', 'Stage 3: Collision Metrics', 'WindowStyle', 'docked');
 
     % Subplot (a): Electron Collision Time
     ax2a = subplot(2, 2, 1); hold(ax2a, 'on'); grid(ax2a, 'on'); box(ax2a, 'on');

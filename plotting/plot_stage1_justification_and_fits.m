@@ -6,6 +6,7 @@ function plot_stage1_justification_and_fits(constants, exp_data, velocity_result
 %      justifies the theoretical approach of the thesis (Matches Thesis Fig. 3.4).
 %   3. The full analysis of the velocity profile, including the Fourier-Bessel fit
 %      (Matches Thesis Fig. 3.5).
+%   Creates three key figures, each opening as a tab in a docked window.
 
     arguments
         constants (1,1) struct
@@ -21,7 +22,7 @@ function plot_stage1_justification_and_fits(constants, exp_data, velocity_result
     r_norm = r_fine / constants.machine.a;
 
     % --- Figure 1: Ion Temperature Profile Analysis (Thesis Fig. 3.6) ---
-    fig1 = figure('Name', 'Ion Temperature Profile Analysis');
+    fig1 = figure('Name', 'Stage 1: Temp Fit', 'WindowStyle', 'docked');
     ax1 = gca; hold(ax1, 'on');
     errorbar(ax1, exp_data.r_Ti_exp / constants.machine.a, exp_data.Ti_reconstructed_exp, ...
         exp_data.Ti_reconstructed_err_exp, 'ko', 'MarkerFaceColor', 'k', ...
@@ -37,7 +38,7 @@ function plot_stage1_justification_and_fits(constants, exp_data, velocity_result
     saveas(fig1, fullfile(save_dir, 'stage1_temp_fit.png')); savefig(fig1, fullfile(save_dir, 'stage1_temp_fit.fig'));
 
     % --- Figure 2: Helander Model Justification (Thesis Fig. 3.4) ---
-    fig2 = figure('Name', 'Helander Model Justification');
+    fig2 = figure('Name', 'Stage 1: Helander Model', 'WindowStyle', 'docked');
     ax2 = gca; hold(ax2, 'on');
     h1 = errorbar(ax2, exp_data.r_Vphi_exp / constants.machine.a, -exp_data.Vphi_exp, ...
         exp_data.Vphi_err_exp, 'ko', 'MarkerFaceColor', 'k', 'MarkerSize', 8, ...
@@ -55,7 +56,7 @@ function plot_stage1_justification_and_fits(constants, exp_data, velocity_result
     saveas(fig2, fullfile(save_dir, 'stage1_helander_justification.png')); savefig(fig2, fullfile(save_dir, 'stage1_helander_justification.fig'));
 
     % --- Figure 3: Velocity Profile Fourier-Bessel Analysis (Thesis Fig. 3.5) ---
-    fig3 = figure('Name', 'Velocity Profile Analysis');
+    fig3 = figure('Name', 'Stage 1: Velocity Fit', 'WindowStyle', 'docked');
     ax3 = gca; hold(ax3, 'on');
     errorbar(ax3, exp_data.r_Vphi_exp / constants.machine.a, -exp_data.Vphi_exp, ...
         exp_data.Vphi_err_exp, 'ko', 'MarkerFaceColor', 'k', 'MarkerSize', 8, 'LineWidth', 1.5, 'DisplayName', 'Experimental Data');

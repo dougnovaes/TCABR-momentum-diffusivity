@@ -5,6 +5,7 @@ function plot_stage2_thesis_method(constants, neutral_profile, collision_profile
 %   method for calculating effective diffusivity.
 %   - Figure 1: Neutral Density (Thesis Fig 3.7 main) & CX Rate (Fig 3.7 inset).
 %   - Figure 2: Collision Freq (Fig 3.8 inset) & Eff. Diffusivity (Fig 3.8 main).
+%   Creates two figures, each opening as a tab in a docked window.
 
     arguments
         constants (1,1) struct
@@ -20,7 +21,7 @@ function plot_stage2_thesis_method(constants, neutral_profile, collision_profile
     orange_color = [217, 83, 25] / 255;
 
     % --- Figure 1: Neutral Density & CX Rate (Side-by-Side) ---
-    fig1 = figure('Name', 'Neutral Density and CX Rate', 'Position', [100, 100, 1200, 600]);
+    fig1 = figure('Name', 'Stage 2: Neutrals & CX Rate', 'WindowStyle', 'docked');
     ax1_left = subplot(1, 2, 1); hold(ax1_left, 'on');
     plot(ax1_left, r_norm, neutral_profile.n_H0 / 1e16, 'LineWidth', 5, 'Color', orange_color, 'DisplayName', 'Neutral Density Profile');
     yline(ax1_left, 0, '--'); grid(ax1_left, 'on');
@@ -41,7 +42,7 @@ function plot_stage2_thesis_method(constants, neutral_profile, collision_profile
     saveas(fig1, fullfile(save_dir, 'stage2_neutrals_cx.png')); savefig(fig1, fullfile(save_dir, 'stage2_neutrals_cx.fig'));
 
     % --- Figure 2: Effective Diffusivity & Collision Freq. (Side-by-Side) ---
-    fig2 = figure('Name', 'Collision Frequency and Effective Diffusivity', 'Position', [150, 150, 1200, 600]);
+    fig2 = figure('Name', 'Stage 2: Freq & Diffusivity', 'WindowStyle', 'docked');
     ax2_left = subplot(1, 2, 1); hold(ax2_left, 'on');
     nu_iH0 = collision_profiles.nu_iH0;
     fill(ax2_left, [r_norm; flipud(r_norm)], [nu_iH0.ci_lower / 1e3; flipud(nu_iH0.ci_upper / 1e3)], ...
