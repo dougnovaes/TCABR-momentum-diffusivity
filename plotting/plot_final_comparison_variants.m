@@ -44,7 +44,7 @@ function plot_final_comparison_variants(diffusivity_exp, variants, constants, sa
         model_name = pinch_models{i};
         model_data = variants.(model_name);
         
-        fig = figure('Name', ['Comparison vs. ', model_name], 'Position', [100, 100, 1000, 750]);
+        fig = figure('Name', ['Comparison vs. ', model_name], 'WindowStyle', 'docked');
         ax = gca;
         hold(ax, 'on');
 
