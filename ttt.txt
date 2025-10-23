@@ -1,8 +1,2362 @@
-Quero que você compare a minha difusividade efetiva com a teórica prevista na eq. (3.14) da tese e que se encontra nos artigos. Percebi que não faz sentido comparar a difusividade efetiva com as difusividades puras das leis de escala, mas sim com as efetivas da eq. (3.14) construídas a partir das leis de escala. No entanto, como há espaço para investigação sobre qual raio as teorias usam, isso permite explorar as combinações e compará-las ao meu resultado. Ademais, como meus parâmetros de ajuste da gaussiana para o perfil de partículas neutras beira ao especulativo, apesar das referências, alterei os parâmetros para: 
-% Based on fitting to scaling laws
-constants.models.neutrals.n_H0_centre = 1e15;       % Density at the centre [m^-3] [cite: 320]
-constants.models.neutrals.n_H0_max_amp = 2e16;      % Maximum amplitude of the Gaussian peak [m^-3] [cite: 352]
-constants.models.neutrals.r_max_H_alpha = 0.1564;     % Radial position of max H-alpha emission [m]
-constants.models.neutrals.width = 0.022;           % Gaussian width (penetration depth) [m] [cite: 353]
+function set_publication_style(ax)
+%SET_PUBLICATION_STYLE Applies a standardised, publication-quality style to an axes object.
+%   This function configures font sizes, line widths, interpreters, and other
+%   graphical properties to ensure a consistent and professional appearance
+%   across all generated figures.
+%
+%   Syntax:
+%       set_publication_style(ax)
+%
+%   Input:
+%       ax - The axes handle to be styled (e.g., from gca).
 
-Isso fez minha difusividade efetiva se aproximar muito, muito mesmo, da efetiva teórica calculada do modo como está na função plot_stage4_final_comparison atual.
+    set(ax, ...
+        'FontSize', 24, ...                         % Set main font size for labels
+        'TickLabelInterpreter', 'latex', ...          % Render tick labels using LaTeX
+        'XMinorTick', 'on', ...                       % Enable minor ticks on x-axis
+        'YMinorTick', 'on', ...                       % Enable minor ticks on y-axis
+        'LineWidth', 1.5, ...                       % Set thickness of axis lines and ticks
+        'Box', 'on', ...                            % Ensure the plot box is drawn
+        'FontName', 'Times New Roman');             % Use a standard serif font
+
+    % Style the title and labels
+    ax.Title.Interpreter = 'latex';
+    ax.XLabel.Interpreter = 'latex';
+    ax.YLabel.Interpreter = 'latex';
+    
+    % Style the legend, if it exists
+    if ~isempty(ax.Legend)
+        ax.Legend.Interpreter = 'latex';
+        ax.Legend.FontSize = 22;
+        box(ax.Legend, 'off');
+    end
+end
+
+function constants = setup_constants()
+%SETUP_CONSTANTS Defines and returns a structure with all project constants.
+%   This function organises all physical constants, machine parameters, and
+%   analysis settings into a nested structure for clarity and easy access.
+%
+%   Output:
+%       constants - A structure containing all defined constants.
+
+% --- Machine and Discharge Parameters ---
+constants.machine.a = 0.18;         % Minor radius [m]
+constants.machine.R0 = 0.61;        % Major radius [m]
+constants.machine.Ip = 90E3;        % Plasma current [A]
+constants.machine.B0 = 1.07;        % On-axis magnetic field [T]
+constants.machine.epsilon_aspect_ratio = constants.machine.a / constants.machine.R0; % Inverse aspect ratio
+
+% --- Fundamental Physical Constants (SI units) ---
+constants.physics.e_charge = 1.60217663E-19;      % Elementary charge [C]
+constants.physics.me = 9.1093837E-31;             % Electron mass [kg]
+constants.physics.mp = 1.672622E-27;             % Proton mass [kg]
+constants.physics.mu0 = 4 * pi * 1E-7;            % Vacuum permeability [H/m]
+constants.physics.epsilon0 = 8.854187812E-12;     % Vacuum permittivity [F/m]
+constants.physics.kB = 1.380649E-23;              % Boltzmann constant [J/K]
+constants.physics.c_light = 299792458;           % Speed of light [m/s]
+
+% --- Plasma Species and Analysis Parameters ---
+% NOTE: Throughout the code, 'ion' refers to the main hydrogen species (H+).
+% The toroidal velocity is measured from C6+ impurities, assuming V_phi_C6+ ~ V_phi_H+.
+constants.plasma.m_ion = constants.physics.mp;      % Mass of main ion (Hydrogen) [kg]
+constants.plasma.m_ion_amu = 1.00784;             % Atomic mass of main ion [amu]
+constants.plasma.m_impurity = 1.9926465E-26;      % Mass of impurity (Carbon-12) [kg]
+constants.plasma.Zi = 1;                          % Charge number of main ion (H+) [e]
+% constants.plasma.Z_impurity = 6;                  % Charge number of impurity (C6+) [e]
+constants.plasma.Zeff = 3;                        % Typical effective charge
+constants.plasma.coulomb_log = 17;                % Typical Coulomb logarithm
+constants.plasma.kvPS = -1.83;                    % Pfirsch-Schlüter regime coefficient
+
+% --- Analysis Settings ---
+constants.analysis.num_radial_points = 1000;      % Number of points in the fine radial grid
+constants.analysis.num_zeros_bessel = 70;         % Number of Bessel zeros for the series fit
+constants.analysis.num_iterations = 5000;         % Number of iterations for bootstrap/Monte Carlo methods
+constants.analysis.generate_final_plots = true;
+
+% --- Model-Specific Parameters ---
+% Parameters for the Gaussian neutral density profile model (n_H0)
+% Based on thesis section 3.4, referencing Kantor et al. (2007, 2012) and Severo et al. (2021).
+% constants.models.neutrals.n_H0_centre = 2e15;       % Density at the centre [m^-3] [cite: 320]
+% constants.models.neutrals.n_H0_max_amp = 5e16;      % Maximum amplitude of the Gaussian peak [m^-3] [cite: 352]
+% constants.models.neutrals.r_max_H_alpha = 0.16;     % Radial position of max H-alpha emission [m]
+% constants.models.neutrals.width = 0.04;           % Gaussian width (penetration depth) [m] [cite: 353]
+
+% Based on fitting to scaling laws
+constants.models.neutrals.n_H0_centre = 1e15;       % Density at the centre [m^-3] 
+constants.models.neutrals.n_H0_max_amp = 2.2e16;    % Maximum amplitude of the Gaussian peak [m^-3] 
+constants.models.neutrals.r_max_H_alpha = 0.1564;   % Radial position of max H-alpha emission [m]
+constants.models.neutrals.width = 0.022;            % Gaussian width (penetration depth) [m] 
+
+% --- File Paths ---
+constants.data.filename = 'experimental_profiles.txt';
+constants.data.path = fullfile('data', constants.data.filename);
+
+end
+
+% =========================================================================
+% main_analysis.m
+% =========================================================================
+% TCABR MOMENTUM TRANSPORT ANALYSIS (MODULAR & CACHE-ENABLED)
+% =========================================================================
+% PURPOSE:
+%   This main script orchestrates the entire data analysis pipeline for
+%   toroidal momentum transport in the TCABR tokamak. It is designed for
+%   modular execution, per-stage caching, and controlled plotting.
+%
+% DESIGN:
+%   - Modular "stage" system: results saved to /results as .mat per stage.
+%   - Clear separation between computation, visualisation, and studies.
+%   - Interruptible pipeline via 'run_flags' and 'plot_flags'.
+%
+% LAYOUT:
+%   Root/
+%     ├── src/         # Core computational routines (physics & analysis)
+%     ├── utils/       # Utility functions and wrappers
+%     ├── plotting/    # Publication-quality visualisation scripts
+%     ├── studies/     # High-level parameter scans or specialised analyses
+%     └── results/     # Per-stage .mat results and plots
+%
+% REQUIREMENTS:
+%   MATLAB R2025b or newer
+% =========================================================================
+
+clc; clear; close all;
+fprintf('>>> Initiating TCABR modular momentum analysis pipeline...\n\n');
+
+% -------------------------------------------------------------------------
+% PATH SETUP
+% -------------------------------------------------------------------------
+addpath('src', 'plotting', 'utils');
+
+results_dir = 'results';
+if ~exist(results_dir, 'dir'), mkdir(results_dir); end
+plots_dir = fullfile(results_dir, 'plots');
+if ~exist(plots_dir, 'dir'), mkdir(plots_dir); end
+
+% -------------------------------------------------------------------------
+% CONTROL PANEL
+% -------------------------------------------------------------------------
+t = true; f = false;  % convenience flags
+
+run_flags = struct( ...
+    'setup_and_data',        f, ...
+    'profile_analyses',      f, ...
+    'physics_profiles',      f, ...
+    'theoretical_models',    f, ...
+    'neutral_and_collision', f, ...
+    'diffusivity_thesis',    f, ...
+    'diffusivity_scaling',   f ...
+);
+
+plot_flags = struct( ...
+    'justification_and_fits',   t, ...
+    'thesis_method_results',    f, ...
+    'supporting_profiles',      f, ...
+    'final_comparison',         f ...
+);
+
+study_flags = struct( ...
+    'neutral_scan', f ... % activate studies/scan_neutrals_fit
+);
+
+stop_on_error = true;  % if true, halts execution upon any unhandled error
+
+fprintf('>>> Control panel configured.\n\n');
+
+% =========================================================================
+% PIPELINE EXECUTION
+% =========================================================================
+% Each stage below either loads existing cached results or recomputes and
+% saves them to the results directory.
+
+%% -------------------- STAGE 1: SETUP & DATA ------------------------------
+% Outputs: constants, exp_data, r_fine
+try
+    [constants, exp_data, r_fine] = load_or_compute( ...
+        fullfile(results_dir, 'stage1_setup_data.mat'), ...
+        run_flags.setup_and_data, ...
+        @stage1_setup_and_data, ...
+        {'constants','exp_data','r_fine'});
+    fprintf('[✓] Stage 1 completed: setup & data.\n');
+catch ME
+    handle_stage_error(ME, 1, stop_on_error);
+end
+
+%% -------------------- STAGE 2: PROFILE ANALYSES --------------------------
+% Outputs: velocity_results, temperature_results
+try
+    [velocity_results, temperature_results] = load_or_compute( ...
+        fullfile(results_dir, 'stage2_profiles.mat'), ...
+        run_flags.profile_analyses, ...
+        @() stage2_profiles(exp_data, constants, r_fine), ...
+        {'velocity_results','temperature_results'});
+    fprintf('[✓] Stage 2 completed: profile analyses.\n');
+catch ME
+    handle_stage_error(ME, 2, stop_on_error);
+end
+
+%% -------------------- STAGE 3: PHYSICS PROFILES --------------------------
+% Outputs: magnetic_field, derived_profiles
+try
+    [magnetic_field, derived_profiles] = load_or_compute( ...
+        fullfile(results_dir, 'stage3_physics.mat'), ...
+        run_flags.physics_profiles, ...
+        @() stage3_physics(exp_data, temperature_results, constants, r_fine), ...
+        {'magnetic_field','derived_profiles'});
+    fprintf('[✓] Stage 3 completed: physics profiles.\n');
+catch ME
+    handle_stage_error(ME, 3, stop_on_error);
+end
+
+%% -------------------- STAGE 4: THEORETICAL MODELS -----------------------
+% Outputs: theoretical_models
+try
+    theoretical_models = load_or_compute( ...
+        fullfile(results_dir, 'stage4_models.mat'), ...
+        run_flags.theoretical_models, ...
+        @() stage4_models(temperature_results, magnetic_field, derived_profiles, constants), ...
+        {'theoretical_models'});
+    fprintf('[✓] Stage 4 completed: theoretical models.\n');
+catch ME
+    handle_stage_error(ME, 4, stop_on_error);
+end
+
+%% -------------------- STAGE 5: NEUTRALS & COLLISIONS --------------------
+% Outputs: neutral_profile, collision_profiles
+try
+    [neutral_profile, collision_profiles] = load_or_compute( ...
+        fullfile(results_dir, 'stage5_collisions.mat'), ...
+        run_flags.neutral_and_collision, ...
+        @() stage5_neutral_collision(r_fine, temperature_results, constants), ...
+        {'neutral_profile','collision_profiles'});
+    fprintf('[✓] Stage 5 completed: neutrals & collisions.\n');
+catch ME
+    handle_stage_error(ME, 5, stop_on_error);
+end
+
+%% -------------------- STAGE 6: DIFFUSIVITY (THESIS METHOD) --------------
+% Outputs: effective_diffusivity_thesis
+try
+    effective_diffusivity_thesis = load_or_compute( ...
+        fullfile(results_dir, 'stage6_diffusivity_thesis.mat'), ...
+        run_flags.diffusivity_thesis, ...
+        @() stage6_diffusivity_thesis(velocity_results, collision_profiles, r_fine), ...
+        {'effective_diffusivity_thesis'});
+    fprintf('[✓] Stage 6 completed: effective diffusivity (thesis method).\n');
+catch ME
+    handle_stage_error(ME, 6, stop_on_error);
+end
+
+%% -------------------- STAGE 7: DIFFUSIVITY (SCALING LAWS) ---------------
+% Outputs: scaling_law_results
+try
+    scaling_law_results = load_or_compute( ...
+        fullfile(results_dir, 'stage7_diffusivity_scaling.mat'), ...
+        run_flags.diffusivity_scaling, ...
+        @() stage7_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine), ...
+        {'scaling_law_results'});
+    fprintf('[✓] Stage 7 completed: effective diffusivity (scaling laws).\n');
+catch ME
+    handle_stage_error(ME, 7, stop_on_error);
+end
+
+fprintf('\n>>> All calculation stages executed (or loaded) successfully.\n\n');
+
+% =========================================================================
+% PLOTTING SECTION
+% =========================================================================
+fprintf('--- Generating selected plots ---\n');
+
+try
+    if plot_flags.justification_and_fits
+        plot_justification_and_fits(constants, exp_data, velocity_results, ...
+            temperature_results, theoretical_models, r_fine);
+    end
+
+    if plot_flags.thesis_method_results
+        plot_thesis_method_results(constants, neutral_profile, collision_profiles, ...
+            effective_diffusivity_thesis, r_fine);
+    end
+
+    if plot_flags.supporting_profiles
+        plot_supporting_profiles(constants, derived_profiles, r_fine);
+    end
+
+    if plot_flags.final_comparison
+        % Compute or load chi_eff variants for theoretical comparison
+        if ~exist('variants','var') || isempty(variants)
+            variants = compute_chi_eff_variants(scaling_law_results, ...
+                velocity_results, derived_profiles, constants, r_fine);
+        end
+        plot_final_comparison(effective_diffusivity_thesis, variants, ...
+            scaling_law_results, constants);
+    end
+catch ME
+    warning(ME.identifier,'Plotting phase failed: %s', ME.message);
+end
+
+% =========================================================================
+% STUDY SECTION (optional)
+% =========================================================================
+if study_flags.neutral_scan
+    try
+        fprintf('--- Running neutral density parameter scan ---\n');
+        addpath('studies');
+        run('studies/run_scan_neutrals_fit.m');
+    catch ME
+        warning(ME.identifier,'Neutral scan study failed: %s', ME.message);
+    end
+end
+
+fprintf('\n>>> TCABR modular momentum analysis completed successfully.\n');
+
+% =========================================================================
+% LOCAL UTILITY FUNCTIONS
+% =========================================================================
+function handle_stage_error(ME, stage_num, stop_on_error)
+    fprintf(2, '[X] Stage %d failed: %s\n', stage_num, ME.message);
+    if stop_on_error, rethrow(ME); end
+end
+
+function varargout = load_or_compute(filepath, force_recalc, compute_func, out_names)
+    if exist(filepath, 'file') && ~force_recalc
+        fprintf('Loading cached results from: %s\n', filepath);
+        S = load(filepath);
+        varargout = cell(1, nargout);
+        for k = 1:nargout
+            varargout{k} = S.(out_names{k});
+        end
+        return;
+    end
+    fprintf('Computing and saving results to: %s\n', filepath);
+    [varargout{1:nargout}] = compute_func();
+    S = struct();
+    for k = 1:nargout
+        S.(out_names{k}) = varargout{k};
+    end
+    save(filepath, '-struct', 'S');
+end
+
+% --- Stage wrappers (simple delegation to /src functions) ----------------
+function [constants, exp_data, r_fine] = stage1_setup_and_data()
+    constants = setup_constants();
+    exp_data = load_experimental_data(constants);
+    r_fine = exp_data.r_profiles;
+end
+
+function [velocity_results, temperature_results] = stage2_profiles(exp_data, constants, r_fine)
+    velocity_results = analyze_velocity_profile(exp_data, constants, r_fine);
+    temperature_results = analyze_temperature_profile(exp_data, constants, r_fine);
+end
+
+function [magnetic_field, derived_profiles] = stage3_physics(exp_data, temperature_results, constants, r_fine)
+    magnetic_field = compute_magnetic_field(r_fine, constants);
+    derived_profiles = compute_derived_profiles(exp_data, temperature_results, magnetic_field, constants, r_fine);
+end
+
+function theoretical_models = stage4_models(temperature_results, magnetic_field, derived_profiles, constants)
+    theoretical_models = compute_theoretical_models(temperature_results, magnetic_field, derived_profiles, constants);
+end
+
+function [neutral_profile, collision_profiles] = stage5_neutral_collision(r_fine, temperature_results, constants)
+    neutral_profile = compute_neutral_density_profile(r_fine, constants);
+    collision_profiles = compute_collision_profiles(temperature_results, neutral_profile, r_fine);
+end
+
+function effective_diffusivity_thesis = stage6_diffusivity_thesis(velocity_results, collision_profiles, r_fine)
+    effective_diffusivity_thesis = compute_diffusivity_profile(velocity_results, collision_profiles, r_fine);
+end
+
+function scaling_law_results = stage7_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine)
+    scaling_law_results = compute_chi_eff_from_scalings(velocity_results, derived_profiles, constants, r_fine);
+end
+
+% =========================================================================
+% End of main_analysis.m
+% =========================================================================
+
+function [temp_results] = analyze_temperature_profile(exp_data, constants, r_fine)
+%ANALYZE_TEMPERATURE_PROFILE Performs a detailed statistical analysis of the ion temperature profile.
+%   This function fits a canonical profile model to the experimental ion
+%   temperature data. It incorporates robust error handling, diagnostic
+%   tracking, and a Monte Carlo bootstrap method for uncertainty quantification.
+%
+%   Key tasks:
+%   1.  Performs a primary weighted non-linear least-squares fit to the 
+%       reconstructed experimental data to find the optimal parameters (T0, Ta, sigma).
+%   2.  Executes a Monte Carlo bootstrap analysis by repeatedly fitting the model
+%       to data points perturbed within their error bars to determine uncertainties.
+%   3.  Calculates the mean fitted profile, R-squared value, and the 95% 
+%       confidence band.
+%
+%   Syntax:
+%       temp_results = analyze_temperature_profile(exp_data, constants, r_fine)
+%
+%   Inputs:
+%       exp_data  - Structure with experimental Ti data points.
+%       constants - Structure with machine parameters and analysis settings.
+%       r_fine    - The high-resolution radial grid for profile evaluation [m].
+%
+%   Output:
+%       temp_results - A structure containing all analysis results for the ion temperature.
+
+fprintf('Starting ion temperature profile analysis...\n');
+t_start = tic;
+
+% --- 1. Input Validation and Preparation ---
+% Ensure all input vectors are columns for consistency.
+r_exp        = exp_data.r_Ti_exp(:);
+ti_recon_exp = exp_data.Ti_reconstructed_exp(:);
+ti_recon_err = exp_data.Ti_reconstructed_err_exp(:);
+r_fine       = r_fine(:); % Ensure r_fine is a column vector
+
+a            = constants.machine.a;
+n_iter       = constants.analysis.num_iterations;
+n_data       = numel(r_exp);
+n_r          = numel(r_fine);
+
+% --- 2. Define Fit Model, Guesses, and Solver Options ---
+% The canonical profile is wrapped in a helper function 'real_profile' (see end of file)
+% to prevent numerical issues (e.g., complex numbers from negative bases).
+Ti_function = @(params, r_val) real_profile(params, r_val, a);
+
+% Initial guess for parameters [T0; Ta; sigma] and bounds (sigma must be non-negative)
+initial_guess = [270; 30; 3.44]; % As column
+lower_bounds = [-Inf; -Inf; 0];
+upper_bounds = [Inf;  Inf;  Inf];
+
+% Weighted residual (lsqnonlin uses the square root of the weights)
+weights_sqrt = 1 ./ ti_recon_err;
+weighted_residual = @(params) (Ti_function(params, r_exp) - ti_recon_exp) .* weights_sqrt;
+
+options = optimset('Display', 'off', 'TolFun', 1e-6, 'TolX', 1e-6);
+
+% --- 3. Perform Primary Fit on Unperturbed Data ---
+fprintf('Performing primary fit for optimal parameters...\n');
+try
+    params_optimized = lsqnonlin(weighted_residual, initial_guess, lower_bounds, upper_bounds, options);
+catch ME
+    warning(ME.identifier, 'Primary fit failed: %s. Using initial guess as optimised parameters.', ME.message);
+    params_optimized = initial_guess;
+end
+ti_fit_primary = Ti_function(params_optimized, r_fine);
+
+% Calculate R-squared for the primary fit
+ti_fit_at_data_points = Ti_function(params_optimized, r_exp);
+ss_res = sum((ti_recon_exp - ti_fit_at_data_points).^2);
+ss_tot = sum((ti_recon_exp - mean(ti_recon_exp)).^2);
+r_squared = 1 - ss_res / (ss_tot + eps); % Add eps to prevent division by zero
+fprintf('Primary fit complete. R-squared: %.4f\n', r_squared);
+
+% --- 4. Monte Carlo Bootstrap for Uncertainty Analysis ---
+% Pre-generate all perturbed datasets for efficiency
+ti_perturbed_sets = ti_recon_exp + ti_recon_err .* randn(n_data, n_iter);
+
+% Pre-allocate with NaN for easy identification of failed fits
+all_fitted_params   = nan(n_iter, numel(initial_guess));
+all_fitted_profiles = nan(n_iter, n_r); % Use (iterations x points) for parfor stability
+convergence_flags   = false(n_iter, 1);
+
+if isempty(gcp('nocreate'))
+    parpool;
+end
+
+fprintf('Running %d bootstrap iterations for uncertainty analysis...\n', n_iter);
+parfor i = 1:n_iter
+    % Define residual function for the current perturbed data set
+    current_residual_func = @(params) ...
+        (Ti_function(params, r_exp) - ti_perturbed_sets(:, i)) .* weights_sqrt;
+    
+    try
+        % Attempt to fit the perturbed data
+        params_perturbed = lsqnonlin(current_residual_func, initial_guess, lower_bounds, upper_bounds, options);
+        
+        % Check for a valid fit before storing
+        if all(isfinite(params_perturbed))
+            all_fitted_params(i, :) = params_perturbed;
+            all_fitted_profiles(i, :) = Ti_function(params_perturbed, r_fine)'; % Store as a row
+            convergence_flags(i) = true;
+        end
+    catch
+        % If lsqnonlin fails, the pre-allocated NaN values are kept.
+    end
+end
+
+% --- 5. Post-Process Bootstrap Results ---
+n_converged = sum(convergence_flags);
+n_failed = n_iter - n_converged;
+fprintf('Bootstrap finished: %d iterations succeeded, %d failed.\n', n_converged, n_failed);
+if n_converged < 0.5 * n_iter
+    warning('Less than 50%% of bootstrap iterations converged. Results may be unreliable.');
+end
+
+% Filter out any rows corresponding to failed iterations before calculating statistics
+valid_params   = all_fitted_params(convergence_flags, :);
+valid_profiles = all_fitted_profiles(convergence_flags, :);
+
+% Calculate mean profile, std dev, and confidence intervals from valid fits
+ti_profile_avg = mean(valid_profiles, 1)'; % Mean of rows, then transpose to column
+ti_profile_std = std(valid_profiles, 0, 1)';
+
+ci_percentiles = prctile(valid_profiles, [2.5, 97.5], 1);
+ti_profile_ci_lower = ci_percentiles(1, :)'; % Transpose to column
+ti_profile_ci_upper = ci_percentiles(2, :)'; % Transpose to column
+
+param_uncertainties = std(valid_params, 0, 1);
+
+% --- 6. Package Results into Output Structure ---
+temp_results.r_fine = r_fine;
+temp_results.profile_primary_fit = ti_fit_primary;
+temp_results.params_optimized.T0 = params_optimized(1);
+temp_results.params_optimized.Ta = params_optimized(2);
+temp_results.params_optimized.sigma = params_optimized(3);
+temp_results.r_squared = r_squared;
+temp_results.profile_avg = ti_profile_avg;
+temp_results.profile_std = ti_profile_std;
+temp_results.profile_ci_lower = ti_profile_ci_lower;
+temp_results.profile_ci_upper = ti_profile_ci_upper;
+temp_results.param_uncertainties.T0_err = param_uncertainties(1);
+temp_results.param_uncertainties.Ta_err = param_uncertainties(2);
+temp_results.param_uncertainties.sigma_err = param_uncertainties(3);
+temp_results.bootstrap.all_fitted_profiles = all_fitted_profiles(convergence_flags, :);
+temp_results.bootstrap.n_iterations = n_iter;
+temp_results.bootstrap.n_converged = n_converged;
+temp_results.bootstrap.n_failed = n_failed;
+temp_results.analysis_time_seconds = toc(t_start);
+
+fprintf('Ion temperature analysis finished in %.2f s.\n\n', temp_results.analysis_time_seconds);
+
+end
+
+% --- Local Helper Function for Numerical Stability ---
+function Ti = real_profile(params, r, a)
+    %REAL_PROFILE Safely evaluates the canonical Ti profile, ensuring a real-valued output.
+    T0 = params(1);
+    Ta = params(2);
+    sigma = params(3);
+    
+    base = 1 - (r(:) ./ a).^2;
+    % Clip negative values in the base that can arise from floating point errors
+    % near r=a. This prevents complex results when sigma is non-integer.
+    base(base < 0) = 0;
+    
+    Ti = (T0 - Ta) .* (base .^ sigma) + Ta;
+    % Ensure output is a real, double-precision column vector.
+    Ti = real(double(Ti(:)));
+end
+
+function [velocity_results] = analyze_velocity_profile(exp_data, constants, r_fine)
+%ANALYZE_VELOCITY_PROFILE Performs a detailed statistical analysis of the toroidal velocity profile.
+%   This function executes a robust analysis of the experimental toroidal
+%   velocity data. Its main tasks are:
+%   1.  Performs a Monte Carlo bootstrap analysis by repeatedly fitting a 5th-order 
+%       weighted polynomial to data points perturbed within their error bars.
+%   2.  Calculates the mean polynomial fit, the R-squared value, and the 95% 
+%       confidence interval for the velocity profile.
+%   3.  Fits the mean velocity profile to a Fourier-Bessel series to determine
+%       the eigenvalues (lambda_j) of the system.
+%   4.  Calculates the coefficient for the effective momentum diffusivity based on
+%       the derived eigenvalues.
+%
+%   Syntax:
+%       velocity_results = analyze_velocity_profile(exp_data, constants)
+%
+%   Inputs:
+%       exp_data  - Structure containing the experimental data points (r_Vphi_exp, Vphi_exp, etc.).
+%       constants - Structure containing machine parameters and analysis settings.
+%
+%   Output:
+%       velocity_results - A structure containing all analysis results, including fitted
+%                          profiles, confidence intervals, and derived physics coefficients.
+
+fprintf('Starting toroidal velocity profile analysis...\n');
+tic;
+
+% --- 1. Initial Setup and Parameter Extraction ---
+r_exp       = exp_data.r_Vphi_exp;
+v_phi_exp   = exp_data.Vphi_exp * 1000;   % Convert km/s to m/s for calculations
+v_phi_err   = exp_data.Vphi_err_exp * 1000; % Convert km/s to m/s
+n_iter      = constants.analysis.num_iterations;
+a           = constants.machine.a;
+epsilon     = constants.machine.epsilon_aspect_ratio;
+
+% --- 2. Monte Carlo Bootstrap for Polynomial Fit ---
+% This loop fits a weighted polynomial for n_iter random perturbations
+% of the experimental data to determine the uncertainty of the fit.
+
+% Pre-allocate memory for performance
+poly_coeffs_store = zeros(n_iter, 6); % 6 coeffs for a 5th-order polynomial
+
+% Set up the fit type and options for the curve fitting toolbox
+fit_type = fittype('poly5');
+weights = 1 ./ (v_phi_err.^2);
+fit_opts = fitoptions('Method', 'LinearLeastSquares', 'Weights', weights);
+
+% Ensure a parallel pool is available for faster computation
+if isempty(gcp('nocreate'))
+    parpool;
+end
+
+fprintf('Running %d bootstrap iterations for polynomial fit...\n', n_iter);
+parfor i = 1:n_iter
+    % Perturb data points using a normal distribution defined by the error bars
+    v_perturbed = v_phi_exp + v_phi_err .* randn(size(v_phi_exp));
+    
+    % Perform the weighted fit using the modern 'fit' function
+    fitted_model = fit(r_exp, v_perturbed, fit_type, fit_opts);
+    
+    % Store the polynomial coefficients
+    poly_coeffs_store(i, :) = coeffvalues(fitted_model);
+end
+
+% --- 3. Process Polynomial Fit Results ---
+% Calculate the average fit and confidence intervals from the bootstrap results.
+
+% Average polynomial coefficients and the resulting mean velocity profile
+mean_poly_coeffs = mean(poly_coeffs_store, 1);
+v_phi_poly_avg_fine = polyval(mean_poly_coeffs, r_fine);
+
+% Evaluate all fitted polynomials on the fine grid to get profile statistics
+v_phi_perturbed_fine = zeros(length(r_fine), n_iter);
+for i = 1:n_iter
+    v_phi_perturbed_fine(:, i) = polyval(poly_coeffs_store(i, :), r_fine);
+end
+
+% Calculate 95% confidence intervals using the percentile method (robust)
+confidence_level = 0.95;
+lower_percentile = (1 - confidence_level) / 2 * 100;
+upper_percentile = (1 + confidence_level) / 2 * 100;
+
+v_phi_poly_ci_lower = prctile(v_phi_perturbed_fine, lower_percentile, 2);
+v_phi_poly_ci_upper = prctile(v_phi_perturbed_fine, upper_percentile, 2);
+
+% Calculate R-squared value for the mean fit against the original data
+predicted_values_exp = polyval(mean_poly_coeffs, r_exp);
+ss_res = sum(weights .* (v_phi_exp - predicted_values_exp).^2);
+ss_tot = sum(weights .* (v_phi_exp - mean(v_phi_exp)).^2);
+r_squared = 1 - (ss_res / ss_tot);
+
+fprintf('Polynomial analysis complete. R-squared: %.2f\n', r_squared);
+
+% --- 4. Fourier-Bessel Series Analysis ---
+% Fit the mean velocity profile to a series of Bessel functions to find eigenvalues.
+fprintf('Performing Fourier-Bessel series fit...\n');
+
+num_zeros = constants.analysis.num_zeros_bessel;
+lambda_zeros = findBesselZeros(num_zeros, 0) / a; % Calculate lambda_j = z_j / a
+
+% Formulate the linear system A*x = b for the Bessel fit
+A_bessel = zeros(length(r_fine), num_zeros);
+for k = 1:num_zeros
+    A_bessel(:, k) = besselj(0, lambda_zeros(k) * r_fine);
+end
+
+% Solve for the Bessel coefficients using linear least squares (A \ b)
+bessel_coeffs = A_bessel \ v_phi_poly_avg_fine;
+
+% Reconstruct the velocity profile from the Bessel series
+v_phi_bessel_fit_fine = A_bessel * bessel_coeffs;
+
+% --- 5. Calculate Physics Parameters ---
+% Use the derived eigenvalues to calculate the diffusivity coefficient.
+sum_inv_lambda_sq = sum(1 ./ lambda_zeros.^2);
+
+% This is the coefficient from Eq. 3.13, which multiplies nu_iH0.
+% The nu_iH0 profile itself will be calculated in a separate function.
+chi_phi_coeff = (sum_inv_lambda_sq) * ((3 / (4 * epsilon)) - 1);
+
+fprintf('Bessel analysis complete. Sum of inverse squared lambdas: %.4f m^2\n', sum_inv_lambda_sq);
+
+% --- 6. Package Results into Output Structure ---
+velocity_results.r_fine = r_fine; % Fine radial grid [m]
+
+% Polynomial fit results (in m/s)
+velocity_results.poly_fit_avg = v_phi_poly_avg_fine;
+velocity_results.poly_fit_ci_lower = v_phi_poly_ci_lower;
+velocity_results.poly_fit_ci_upper = v_phi_poly_ci_upper;
+velocity_results.r_squared = r_squared;
+velocity_results.poly_coeffs = mean_poly_coeffs;
+
+% Bessel fit results (in m/s)
+velocity_results.bessel_fit = v_phi_bessel_fit_fine;
+velocity_results.lambda_zeros = lambda_zeros;
+velocity_results.sum_inv_lambda_sq = sum_inv_lambda_sq;
+
+% Derived physics parameter coefficients
+velocity_results.chi_phi_coeff = chi_phi_coeff; % [m^2]
+
+analysis_time = toc;
+fprintf('Toroidal velocity analysis finished in %.2f seconds.\n\n', analysis_time);
+
+end
+
+function [scaling_law_results] = compute_chi_eff_from_scalings(velocity_results, derived_profiles, constants, r_fine)
+%COMPUTE_CHI_EFF_FROM_SCALINGS Calculates effective diffusivity from theoretical scaling laws.
+%   This function computes theoretical profiles for the effective momentum
+%   diffusivity (chi_phi_eff) based on the formula from Peeters et al. (2007)
+%   (Eq. 3.14 in the thesis):
+%       chi_phi_eff = chi_phi * (1 + (R*V_pinch/chi_phi) * (1 / (R/L_Vphi)))
+%
+%   It uses a single model for the 'pure' diffusivity (Solomon) and combines
+%   it with various theoretical models for the pinch velocity (Solomon, Hahm,
+%   Gürcan, Peeters) to generate a set of comparable chi_phi_eff profiles.
+%
+%   Syntax:
+%       scaling_law_results = compute_chi_eff_from_scalings(velocity_results, derived_profiles, constants, r_fine)
+%
+%   Inputs:
+%       velocity_results - Structure from analyze_velocity_profile.
+%       derived_profiles - Structure with nu_star_e, R_over_Ln, etc.
+%       constants        - Structure with all project constants.
+%       r_fine           - The high-resolution radial grid [m].
+%
+%   Output:
+%       scaling_law_results - A structure containing all calculated theoretical
+%                             profiles and intermediate values.
+
+fprintf('Calculating effective diffusivity from scaling laws...\n');
+
+% --- 1. Extract Necessary Profiles and Parameters ---
+a         = constants.machine.a;
+R0        = constants.machine.R0;
+nu_star_e = derived_profiles.nu_star_e;
+
+% --- 2. Calculate Constant Values for R/L_n and R/L_Vphi ---
+% As per the methodology, we use characteristic values for the normalised
+% gradients evaluated at mid-radius (r/a = 0.5) instead of the full profiles.
+[~, idx_mid] = min(abs(r_fine - a * 0.5));
+
+% Calculate R/L_Vphi = -R0 * (1/V_phi) * (dV_phi/dr)
+Vphi_profile = velocity_results.poly_fit_avg;
+grad_Vphi = gradient(Vphi_profile, r_fine);
+R_over_LVphi_profile = -R0 ./ Vphi_profile .* grad_Vphi;
+R_over_LVphi_const = R_over_LVphi_profile(idx_mid); % Use value at r/a=0.5
+
+% Get the value of R/L_n at r/a = 0.5 for the Solomon diffusivity calculation
+R_over_Ln_const_calc = derived_profiles.R_over_Ln(idx_mid);
+
+fprintf('... using characteristic values at r/a=0.5: R/L_n = %.2f, R/L_Vphi = %.2f\n', ...
+    R_over_Ln_const_calc, R_over_LVphi_const);
+
+% --- 3. Calculate Base Diffusivity and Pinch Velocity Profiles ---
+% These are the building blocks for the final chi_phi_eff calculations.
+
+% Solomon momentum diffusivity, chi_phi^(Solo) (using constant R/L_n)
+% Coefficients from Solomon et al. (2010)
+A = 6.09; B = 0.157; C = -24.2;
+chi_phi_solo_profile = A * nu_star_e + B * R_over_Ln_const_calc;
+
+% Solomon pinch velocity, V_pinch^(Solo)
+v_pinch_solo_profile = C * nu_star_e;
+
+% Hahm pinch velocity, V_pinch^(Hahm) = -2*chi_phi/R0
+v_pinch_hahm_profile = -2 * chi_phi_solo_profile / R0;
+
+% Gürcan pinch velocity, V_pinch^(Gürc) = -(2*chi_phi/R)*(F + r/R0)
+% For now, F (turbulence asymmetry factor) is assumed to be 1.
+F = 1.0;
+R_coord = R0 * (1 + r_fine / R0);
+v_pinch_gurcan_profile = -(2 * chi_phi_solo_profile ./ R_coord) .* (F + r_fine / R0);
+
+% Peeters pinch velocity, V_pinch^(Peet) = (chi_phi/R)*(-4 - R/L_n)
+% We calculate this for two cases as done in the thesis.
+v_pinch_peeters_Rln2_profile   = (chi_phi_solo_profile ./ R_coord) .* (-4 - 2);
+v_pinch_peeters_Rln_calc_profile = (chi_phi_solo_profile ./ R_coord) .* (-4 - R_over_Ln_const_calc);
+
+
+% --- 4. Calculate Effective Diffusivity for Each Combination ---
+% Apply Eq. 3.14: chi_eff = chi_phi * (1 + PinchNumber / (R/L_Vphi))
+fprintf('... combining models to compute effective diffusivity profiles\n');
+
+PinchNumber_Solo   = R0 * v_pinch_solo_profile ./ chi_phi_solo_profile;
+PinchNumber_Hahm   = R0 * v_pinch_hahm_profile ./ chi_phi_solo_profile;
+PinchNumber_Gurcan = R0 * v_pinch_gurcan_profile ./ chi_phi_solo_profile;
+PinchNumber_Peet_2 = R0 * v_pinch_peeters_Rln2_profile ./ chi_phi_solo_profile;
+PinchNumber_Peet_C = R0 * v_pinch_peeters_Rln_calc_profile ./ chi_phi_solo_profile;
+
+chi_eff_Solo   = chi_phi_solo_profile .* (1 + PinchNumber_Solo   / R_over_LVphi_const);
+chi_eff_Hahm   = chi_phi_solo_profile .* (1 + PinchNumber_Hahm   / R_over_LVphi_const);
+chi_eff_Gurcan = chi_phi_solo_profile .* (1 + PinchNumber_Gurcan / R_over_LVphi_const);
+chi_eff_Peet_2 = chi_phi_solo_profile .* (1 + PinchNumber_Peet_2 / R_over_LVphi_const);
+chi_eff_Peet_C = chi_phi_solo_profile .* (1 + PinchNumber_Peet_C / R_over_LVphi_const);
+
+% --- 5. Package Results into Output Structure ---
+scaling_law_results.r_fine = r_fine;
+scaling_law_results.chi_phi_solo = chi_phi_solo_profile;
+scaling_law_results.v_pinch_solo = v_pinch_solo_profile;
+scaling_law_results.v_pinch_hahm = v_pinch_hahm_profile;
+scaling_law_results.v_pinch_gurcan = v_pinch_gurcan_profile;
+scaling_law_results.v_pinch_peeters_Rln2 = v_pinch_peeters_Rln2_profile;
+scaling_law_results.v_pinch_peeters_Rln_calc = v_pinch_peeters_Rln_calc_profile;
+scaling_law_results.chi_eff_Solo = chi_eff_Solo;
+scaling_law_results.chi_eff_Hahm = chi_eff_Hahm;
+scaling_law_results.chi_eff_Gurcan = chi_eff_Gurcan;
+scaling_law_results.chi_eff_Peeters_Rln2 = chi_eff_Peet_2;
+scaling_law_results.chi_eff_Peeters_Rln_calc = chi_eff_Peet_C;
+scaling_law_results.R_over_LVphi_const = R_over_LVphi_const;
+scaling_law_results.R_over_Ln_const = R_over_Ln_const_calc;
+
+fprintf('Calculation of effective diffusivity from scaling laws complete.\n\n');
+
+end
+
+function variants = compute_chi_eff_variants(scaling_law_results, velocity_results, derived_profiles, constants, r_fine)
+% COMPUTE_CHI_EFF_VARIANTS
+%   Build several variants of theoretical effective diffusivity chi_phi_eff
+%   combining: use of R0 vs local R(r), and using mid-radius scalar R/L_Vphi
+%   vs full R/L_Vphi profile. Returns a struct with named variants.
+%
+% Inputs:
+%   scaling_law_results - output of compute_chi_eff_from_scalings (contains chi_phi_solo, etc.)
+%   velocity_results    - result of analyze_velocity_profile (contains Vphi fits)
+%   derived_profiles    - derived_profiles (contains R_over_Ln, etc.)
+%   constants, r_fine   - as usual
+%
+% Output:
+%   variants - struct with fields:
+%       .r_fine
+%       .chi_phi_solo
+%       .chi_eff_R0_mid
+%       .chi_eff_R0_profile
+%       .chi_eff_Rlocal_mid
+%       .chi_eff_Rlocal_profile
+%       .meta (struct with used constants)
+
+a   = constants.machine.a;
+R0  = constants.machine.R0;
+r   = r_fine(:);
+r_norm = r ./ a;
+
+% base solo diffusivity profile (already uses an R/Ln constant in compute_chi_eff_from_scalings)
+chi_phi_solo = scaling_law_results.chi_phi_solo(:);
+
+% compute R_over_LVphi profile robustly from velocity_results.poly_fit_avg
+Vphi = velocity_results.poly_fit_avg(:);
+dVdr = gradient(Vphi, r);
+% avoid division by zero: regularise small Vphi
+Vphi_safe = Vphi;
+smallV = abs(Vphi_safe) < 1e-8;
+Vphi_safe(smallV) = sign(Vphi_safe(smallV)).*1e-8 + eps;
+
+R_over_LVphi_profile = -R0 ./ Vphi_safe .* dVdr;  % may contain large values near zeros
+
+% mid-radius index
+[~, idx_mid] = min(abs(r - a*0.5));
+R_over_LVphi_mid = R_over_LVphi_profile(idx_mid);
+
+% build R_coord (local major radius approximation)
+R_coord = R0 * (1 + r ./ R0);
+
+% Pinch models (recompute consistently from chi_phi_solo, to ensure same baseline)
+% Use Solomon pinch (C * nu_star_e) stored previously (but recompute simple forms here)
+% For consistency with compute_chi_eff_from_scalings: use same formulas
+A = 6.09; B = 0.157; C = -24.2;
+nu_star_e = derived_profiles.nu_star_e(:);
+v_pinch_solo = C .* nu_star_e;
+v_pinch_hahm = -2 .* chi_phi_solo ./ R0;
+F = 1;
+v_pinch_gurcan = -(2 .* chi_phi_solo ./ R_coord) .* (F + r ./ R0);
+v_pinch_peeters_Rln2 = (chi_phi_solo ./ R_coord) .* (-4 - 2);
+R_over_Ln_mid = derived_profiles.R_over_Ln(idx_mid);
+v_pinch_peeters_Rln_calc = (chi_phi_solo ./ R_coord) .* (-4 - R_over_Ln_mid);
+
+% Helper to compute chi_eff given PinchNumber and R_over_LVphi (scalar or profile)
+compute_chi_eff = @(PinchNumber, R_over_LVphi) chi_phi_solo .* (1 + PinchNumber ./ R_over_LVphi);
+
+% PinchNumber = R * v_pinch / chi_phi
+Pin_Solo   = R0 .* v_pinch_solo ./ chi_phi_solo;
+Pin_Hahm   = R0 .* v_pinch_hahm ./ chi_phi_solo;
+Pin_Gurcan = R0 .* v_pinch_gurcan ./ chi_phi_solo;
+Pin_Peet2  = R0 .* v_pinch_peeters_Rln2 ./ chi_phi_solo;
+Pin_PeetC  = R0 .* v_pinch_peeters_Rln_calc ./ chi_phi_solo;
+
+% Variants:
+% 1) Use R0 and mid R/L_Vphi (scalar)
+chi_eff_R0_mid = compute_chi_eff(Pin_Solo, R_over_LVphi_mid);    % Solo example
+% We'll compute arrays stacking variants; for clarity produce full set with each pinch model
+chi_eff_R0_mid_Solo   = compute_chi_eff(Pin_Solo, R_over_LVphi_mid);
+chi_eff_R0_mid_Hahm   = compute_chi_eff(Pin_Hahm, R_over_LVphi_mid);
+chi_eff_R0_mid_Gurcan = compute_chi_eff(Pin_Gurcan, R_over_LVphi_mid);
+chi_eff_R0_mid_Peet2  = compute_chi_eff(Pin_Peet2, R_over_LVphi_mid);
+chi_eff_R0_mid_PeetC  = compute_chi_eff(Pin_PeetC, R_over_LVphi_mid);
+
+% 2) Use R0 and full R/L_Vphi profile (pointwise)
+chi_eff_R0_profile_Solo   = compute_chi_eff(Pin_Solo, R_over_LVphi_profile);
+chi_eff_R0_profile_Hahm   = compute_chi_eff(Pin_Hahm, R_over_LVphi_profile);
+chi_eff_R0_profile_Gurcan = compute_chi_eff(Pin_Gurcan, R_over_LVphi_profile);
+chi_eff_R0_profile_Peet2  = compute_chi_eff(Pin_Peet2, R_over_LVphi_profile);
+chi_eff_R0_profile_PeetC  = compute_chi_eff(Pin_PeetC, R_over_LVphi_profile);
+
+% 3) Use local R_coord in PinchNumber (already used for Gurcan/Peeters) and mid R/L_Vphi scalar
+% For completeness you may want a variant where the denominator R_over_LVphi uses local R (ambiguous in literature).
+chi_eff_Rlocal_mid_Solo   = compute_chi_eff(Pin_Solo, R_over_LVphi_mid);
+chi_eff_Rlocal_profile_Solo = compute_chi_eff(Pin_Solo, R_over_LVphi_profile);
+
+% Package
+variants.r_fine = r;
+variants.r_norm = r_norm;
+variants.chi_phi_solo = chi_phi_solo;
+
+variants.R_over_LVphi_profile = R_over_LVphi_profile;
+variants.R_over_LVphi_mid = R_over_LVphi_mid;
+variants.R_over_Ln_mid = R_over_Ln_mid;
+
+variants.chi_eff_R0_mid = struct( ...
+    'Solo',   chi_eff_R0_mid_Solo, ...
+    'Hahm',   chi_eff_R0_mid_Hahm, ...
+    'Gurcan', chi_eff_R0_mid_Gurcan, ...
+    'Peeters_R2', chi_eff_R0_mid_Peet2, ...
+    'Peeters_C',  chi_eff_R0_mid_PeetC );
+
+variants.chi_eff_R0_profile = struct( ...
+    'Solo',   chi_eff_R0_profile_Solo, ...
+    'Hahm',   chi_eff_R0_profile_Hahm, ...
+    'Gurcan', chi_eff_R0_profile_Gurcan, ...
+    'Peeters_R2', chi_eff_R0_profile_Peet2, ...
+    'Peeters_C',  chi_eff_R0_profile_PeetC );
+
+variants.chi_eff_Rlocal_mid = struct( ...
+    'Solo', chi_eff_Rlocal_mid_Solo);
+
+variants.chi_eff_Rlocal_profile = struct( ...
+    'Solo', chi_eff_Rlocal_profile_Solo);
+
+variants.meta.R0 = R0;
+variants.meta.a = a;
+variants.meta.R_over_LVphi_mid = R_over_LVphi_mid;
+variants.meta.R_over_Ln_mid = R_over_Ln_mid;
+
+end
+
+
+function [collision_profiles] = compute_collision_profiles(temperature_results, neutral_profile, r_fine)
+%COMPUTE_COLLISION_PROFILES Calculates charge exchange rate and ion-neutral collision frequency robustly.
+%   This function computes the charge exchange (cx) rate coefficient and the
+%   ion-neutral collision frequency (nu_iH0). It is designed to be highly
+%   robust, with extensive input validation, error handling, and defensive
+%   checks to ensure numerical stability and physical validity.
+%
+%   Syntax:
+%       collision_profiles = compute_collision_profiles(temperature_results, neutral_profile, r_fine)
+
+fprintf('Calculating collision rate and frequency profiles...\n');
+
+% --- 1. Input Validation and Data Sanitisation ---
+% This section ensures that the input data from the bootstrap analysis is a
+% clean, real-valued, double-precision numeric matrix of the correct orientation.
+if ~isfield(temperature_results, 'bootstrap') || ~isfield(temperature_results.bootstrap, 'all_fitted_profiles')
+    error('Input structure is missing the field: temperature_results.bootstrap.all_fitted_profiles');
+end
+all_ti_profiles = temperature_results.bootstrap.all_fitted_profiles;
+
+% Ensure the matrix is 2D and has the expected orientation (iterations x points)
+if ~ismatrix(all_ti_profiles)
+    error('Input ''all_fitted_profiles'' must be a 2D matrix.');
+end
+if size(all_ti_profiles, 2) ~= numel(r_fine)
+    if size(all_ti_profiles, 1) == numel(r_fine)
+        all_ti_profiles = all_ti_profiles'; % Transpose to (iterations x points)
+    else
+        error('Dimension mismatch: The number of points in temperature profiles does not match the radial grid.');
+    end
+end
+
+% Enforce physical and numerical validity
+all_ti_profiles = real(double(all_ti_profiles)); % Discard any residual complex parts
+all_ti_profiles(all_ti_profiles < 0) = 0;      % Temperature cannot be negative
+
+n_H0_profile = neutral_profile.n_H0(:); % Ensure neutral profile is a column vector
+
+% --- 2. Compute Charge Exchange Rate Coefficient ---
+% <sigma*v>_cx = T_i^0.318 * 1e-8 [cm^3/s], where T_i is in eV.
+% Formula from Cornelis et al. (1994), as cited in the thesis (Eq. 3.17).
+fprintf('... calculating charge exchange rate coefficient\n');
+all_cx_rates = (all_ti_profiles .^ 0.318) * 1e-8; % [cm^3/s]
+
+% Calculate statistics from the distribution of rate profiles (operating on rows)
+cx_rate_avg = mean(all_cx_rates, 1)';
+ci_percentiles_rate = prctile(all_cx_rates, [2.5, 97.5], 1);
+cx_rate_ci_lower = ci_percentiles_rate(1, :)';
+cx_rate_ci_upper = ci_percentiles_rate(2, :)';
+
+% --- 3. Compute Ion-Neutral Collision Frequency ---
+% nu_iH0 = <sigma*v>_cx * n_H0
+% A unit conversion from cm^3/s to m^3/s is required (factor of 1e-6).
+fprintf('... calculating ion-neutral collision frequency\n');
+all_nu_iH0 = (all_cx_rates * 1e-6) .* n_H0_profile'; % Broadcasting (matrix .* row vector)
+nu_iH0_avg = mean(all_nu_iH0, 1)';
+ci_nu = prctile(all_nu_iH0, [2.5, 97.5], 1);
+nu_iH0_ci_lower = ci_nu(1, :)';
+nu_iH0_ci_upper = ci_nu(2, :)';
+
+% --- 4. Package Results ---
+collision_profiles.r_fine = r_fine(:);
+collision_profiles.cx_rate.avg      = cx_rate_avg;
+collision_profiles.cx_rate.ci_lower = cx_rate_ci_lower;
+collision_profiles.cx_rate.ci_upper = cx_rate_ci_upper;
+collision_profiles.nu_iH0.avg       = nu_iH0_avg;
+collision_profiles.nu_iH0.ci_lower  = nu_iH0_ci_lower;
+collision_profiles.nu_iH0.ci_upper  = nu_iH0_ci_upper;
+
+fprintf('Collision profiles calculated successfully.\n\n');
+end
+
+function [derived_profiles] = compute_derived_profiles(exp_data, ...
+    temperature_results, magnetic_field, constants, r_fine)
+%COMPUTE_DERIVED_PROFILES Calculates key derived physics profiles for transport analysis.
+%   This function serves as a central hub for calculating essential plasma
+%   profiles derived from the basic experimental and fitted data. It computes
+%   parameters such as the safety factor (q), magnetic shear (s), thermal
+%   velocities, various collision metrics, and standard collisionality (nu*).
+%
+%   Syntax:
+%       derived_profiles = compute_derived_profiles(exp_data, temperature_results, magnetic_field, constants)
+%
+%   Inputs:
+%       exp_data           - Structure with raw experimental profiles (ne, ni).
+%       temperature_results - Structure with fitted temperature profiles.
+%       magnetic_field     - Structure with calculated magnetic field profiles.
+%       constants          - Structure with all project constants.
+%
+%   Output:
+%       derived_profiles - A structure containing all calculated derived profiles.
+
+fprintf('Calculating derived physics profiles...\n');
+
+% --- 1. Extract Core Variables and Prepare Grids ---
+
+B_tor   = magnetic_field.toroidal;
+B_pol   = magnetic_field.poloidal;
+a       = constants.machine.a;
+R0      = constants.machine.R0;
+me      = constants.physics.me;
+mp      = constants.physics.mp; % Main ion is Hydrogen (proton)
+e       = constants.physics.e_charge;
+
+% Use the raw density profiles directly, as they are already on the fine grid.
+% The unnecessary and erroneous interpolation step has been removed.
+ne_fine = exp_data.ne_raw;
+ni_fine = exp_data.ni_raw;
+
+% Get the mean fitted temperature profiles
+Ti_mean = temperature_results.profile_avg; % [eV]
+% Electron temperature profile is calculated analytically, based on the
+% fitted ion temperature at the edge, as done in the original script.
+Te_mean = (509 - Ti_mean(end)) .* (1 - (r_fine / a).^2).^3.3 + Ti_mean(end); % [eV]
+
+
+% --- 2. Safety Factor (q) and Magnetic Shear (s) ---
+% Using the more accurate formula with toroidal correction from the original script.
+fprintf('... calculating safety factor and magnetic shear\n');
+
+B_pol_safe = B_pol + 1e-9; % Add small offset to avoid division by zero at the centre
+% 'fq' is an empirical factor (fix factor by Severo & Novaes, 08/07/2024)
+% used to refine the q-profile calculation.
+fq = exp(0.21303 .* r_fine ./ a); 
+q_profile = (r_fine ./ R0) .* (B_tor ./ B_pol_safe) ./ sqrt(1 - (r_fine ./ R0).^2) .* fq;
+
+% The formula results in NaN at r=0 (0/0). We handle this by extrapolating
+% from the second point, which is a common and physically reasonable approach.
+q_profile(1) = q_profile(2); 
+
+s_profile = (r_fine ./ q_profile) .* gradient(q_profile, r_fine);
+s_profile(1) = 0; % Shear is zero at the magnetic axis by definition.
+
+
+% --- 3. Thermal Velocities ---
+% The thermal velocity is calculated from the fundamental definition: v_th = sqrt(2*k*T/m).
+% This was cross-validated in the original script against the textbook formula from
+% WESSON (2.4 Larmor orbits, p. 42), which is v_T ~ 4.3e5 * sqrt(T[keV]/A_i),
+% confirming their equivalence after accounting for constants and unit conversions.
+fprintf('... calculating thermal velocities\n');
+v_th_i = sqrt(2 * e * Ti_mean / mp); % Ion thermal velocity [m/s]
+v_th_e = sqrt(2 * e * Te_mean / me); % Electron thermal velocity [m/s]
+
+
+% --- 4. Coulomb Logarithms and Collision Frequencies ---
+% These calculations follow the standard Spitzer-Braginskii model.
+fprintf('... calculating collision frequencies\n');
+
+% Coulomb logarithms (dimensionless), formulae from WESSON (14.5 Coulomb logarithm, p. 727).
+ln_lambda_ee = 14.9 - 0.5 * log(ne_fine./1e20) + log(Te_mean./1000);
+ln_lambda_ei = 15.2 - 0.5 * log(ne_fine ./ 1e20) + log(Te_mean ./ 1000);
+ln_lambda_ii = 17.3 - 0.5 * log(ni_fine ./ 1e20) + 1.5 * log(Ti_mean ./ 1000);
+
+% Ion-ion collision time [s], from WESSON (14.6 Collision times, Eq. 14.6.2, p. 730).
+tau_i_calc = 6.6e17 * sqrt(constants.plasma.m_ion_amu) .* (Ti_mean./1000).^(3/2) ./ (ni_fine .* ln_lambda_ii);
+tau_i_15   = 6.6e17 * sqrt(constants.plasma.m_ion_amu) .* (Ti_mean./1000).^(3/2) ./ (ni_fine .* 15); % <-- ADICIONADO
+tau_i_17   = 6.6e17 * sqrt(constants.plasma.m_ion_amu) .* (Ti_mean./1000).^(3/2) ./ (ni_fine .* 17); % <-- ADICIONADO
+
+% Electron-ion collision time [s], from WESSON (14.6 Collision times, Eq. 14.6.1, p. 729).
+tau_e_calc = 1.09e16 .* (Te_mean./1000).^(3/2) ./ (ni_fine .* ln_lambda_ei);
+tau_e_15   = 1.09e16 .* (Te_mean./1000).^(3/2) ./ (ni_fine .* 15);
+tau_e_17   = 1.09e16 .* (Te_mean./1000).^(3/2) ./ (ni_fine .* 17);
+
+
+nu_i_calc = 1 ./ tau_i_calc; % Ion-ion collision frequency [s^-1]
+nu_ei_calc = 1 ./ tau_e_calc; % Electron-ion collision frequency [s^-1]
+
+nu_i_15 = 1 ./ tau_i_15; % Ion-ion collision frequency [s^-1]
+nu_ei_15 = 1 ./ tau_e_15; % Electron-ion collision frequency [s^-1]
+
+% --- 5. Collisionality (nu_*) ---
+% This is the standard definition of collisionality, as defined in WESSON (14.12 Bootstrap current, p.739).
+% NOTE: To maintain consistency with the original monolithic code and the results
+% presented in the thesis, this calculation uses the global inverse aspect ratio
+% (epsilon = a/R0) rather than the local value (epsilon_r = r/R0). This avoids
+% the numerical divergence at the magnetic axis.
+fprintf('... calculating collisionality\n');
+
+R_coord = R0 * (1 + r_fine / R0);
+epsilon = constants.machine.epsilon_aspect_ratio; % Use the global, constant value
+
+% Bounce frequencies [rad/s]
+omega_bounce_i = sqrt(epsilon) .* v_th_i ./ (q_profile .* R_coord);
+omega_bounce_e = sqrt(epsilon) .* v_th_e ./ (q_profile .* R_coord);
+
+% Collisionality (dimensionless)
+nu_star_i = nu_i_15 ./ (epsilon .* omega_bounce_i);
+nu_star_e = nu_ei_15 ./ (epsilon .* omega_bounce_e);
+
+
+% --- 6. Normalised Density Gradient (R/Ln) ---
+L_ne_inv = -gradient(log(ne_fine), r_fine); % Inverse density gradient scale length, 1/L_n [m^-1]
+R_over_Ln = R0 .* L_ne_inv; % Normalised density gradient, R/L_n
+
+
+% --- 7. Package Results into Output Structure ---
+derived_profiles.r_fine     = r_fine;
+derived_profiles.q_profile  = q_profile;
+derived_profiles.s_profile  = s_profile;
+derived_profiles.Te_profile = Te_mean;
+derived_profiles.v_th_i     = v_th_i;
+derived_profiles.v_th_e     = v_th_e;
+derived_profiles.ln_lambda_ee = ln_lambda_ee; % <-- ADICIONADO
+derived_profiles.ln_lambda_ei = ln_lambda_ei; % <-- ADICIONADO
+derived_profiles.ln_lambda_ii = ln_lambda_ii; % <-- ADICIONADO
+derived_profiles.tau_e_calc = tau_e_calc;     % <-- ADICIONADO
+derived_profiles.tau_e_15 = tau_e_15;         % <-- ADICIONADO
+derived_profiles.tau_e_17 = tau_e_17;         % <-- ADICIONADO
+derived_profiles.tau_i_calc = tau_i_calc;     % <-- ADICIONADO
+derived_profiles.tau_i_15 = tau_i_15;         % <-- ADICIONADO
+derived_profiles.tau_i_17 = tau_i_17;         % <-- ADICIONADO
+derived_profiles.nu_i_calc  = nu_i_calc;
+derived_profiles.nu_ei_calc = nu_ei_calc;
+derived_profiles.nu_i_15    = nu_i_15;
+derived_profiles.nu_ei_15   = nu_ei_15;
+derived_profiles.nu_star_i  = nu_star_i;
+derived_profiles.nu_star_e  = nu_star_e;
+derived_profiles.R_over_Ln  = R_over_Ln;
+
+fprintf('Derived profiles calculated successfully.\n\n');
+
+end
+
+function [diffusivity_results] = compute_diffusivity_profile(velocity_results, collision_profiles, r_fine)
+%COMPUTE_DIFFUSIVITY_PROFILE Calculates the effective momentum diffusivity profile.
+%   Produces profile_avg, ci_lower, ci_upper and compatibility aliases:
+%   chi_eff_profile and chi_eff_error (half-width of CI).
+%
+%   Syntax:
+%       diffusivity_results = compute_diffusivity_profile(velocity_results, collision_profiles, r_fine)
+
+fprintf('Calculating effective momentum diffusivity profile...\n');
+
+% --- 1. Extract necessary coefficients and profiles ---
+chi_phi_coeff = velocity_results.chi_phi_coeff; % [m^2] scalar or vector
+nu_iH0 = collision_profiles.nu_iH0;            % struct with .avg, .ci_lower, .ci_upper
+
+% --- 2. Ensure shapes and types (column vectors, double) ---
+r_fine = r_fine(:);
+n_r = numel(r_fine);
+
+% coefficient may be scalar or vector; force to double and conform
+chi_phi_coeff = double(chi_phi_coeff);
+if isscalar(chi_phi_coeff)
+    chi_phi_coeff = chi_phi_coeff * ones(n_r,1);
+else
+    chi_phi_coeff = chi_phi_coeff(:);
+    if numel(chi_phi_coeff) ~= n_r
+        error('chi_phi_coeff length (%d) does not match r_fine (%d).', numel(chi_phi_coeff), n_r);
+    end
+end
+
+% nu_iH0 fields: expect struct with .avg, .ci_lower, .ci_upper (vectors)
+if ~isstruct(nu_iH0) || ~all(isfield(nu_iH0, {'avg','ci_lower','ci_upper'}))
+    error('collision_profiles.nu_iH0 must be a struct with fields .avg, .ci_lower, .ci_upper');
+end
+
+nu_avg = double(nu_iH0.avg(:));
+nu_lo  = double(nu_iH0.ci_lower(:));
+nu_hi  = double(nu_iH0.ci_upper(:));
+
+if any([numel(nu_avg), numel(nu_lo), numel(nu_hi)] ~= n_r)
+    error('nu_iH0 vectors must have same length as r_fine (%d).', n_r);
+end
+
+% --- 3. Calculate the Diffusivity Profile and Propagate Uncertainty ---
+chi_eff_avg      = chi_phi_coeff .* nu_avg;
+chi_eff_ci_lower = chi_phi_coeff .* nu_lo;
+chi_eff_ci_upper = chi_phi_coeff .* nu_hi;
+
+% compute symmetric error (half-width) where meaningful
+chi_eff_err = 0.5 .* (chi_eff_ci_upper - chi_eff_ci_lower);
+
+% Guard against NaN/Inf from pathological inputs
+chi_eff_avg(~isfinite(chi_eff_avg)) = 0;
+chi_eff_ci_lower(~isfinite(chi_eff_ci_lower)) = 0;
+chi_eff_ci_upper(~isfinite(chi_eff_ci_upper)) = 0;
+chi_eff_err(~isfinite(chi_eff_err)) = 0;
+
+% --- 4. Package Results into Output Structure (with compatibility aliases) ---
+diffusivity_results.r_fine         = r_fine;
+diffusivity_results.profile_avg    = chi_eff_avg;        % canonical name used in pipeline
+diffusivity_results.ci_lower       = chi_eff_ci_lower;
+diffusivity_results.ci_upper       = chi_eff_ci_upper;
+diffusivity_results.chi_phi_coeff  = chi_phi_coeff;
+
+% Compatibility: plots / utilities may expect these names
+diffusivity_results.chi_eff_profile = chi_eff_avg;       % alias (old name)
+diffusivity_results.chi_eff_error   = chi_eff_err;       % alias (half-width)
+% also keep named CI fields for other code
+diffusivity_results.ci_halfwidth    = chi_eff_err;       % extra alias
+
+fprintf('Effective momentum diffusivity profile calculated successfully.\n\n');
+end
+
+function [eff_diffusivity] = compute_effective_diffusivity(velocity_results, collision_profiles, r_fine)
+%COMPUTE_EFFECTIVE_DIFFUSIVITY Calculates the effective momentum diffusivity profile.
+%   This function computes the effective momentum diffusivity, chi_phi_eff,
+%   based on the method derived in the thesis (Eq. 3.13), which states:
+%   chi_phi_eff = [ Sum(1/lambda_j^2) * (3/(4*epsilon) - 1) ] * nu_iH0
+%
+%   It combines the eigenvalue-derived coefficient from the velocity analysis
+%   with the ion-neutral collision frequency profile. The function also
+%   robustly propagates the uncertainty from the collision frequency profile
+%   to the final diffusivity profile.
+%
+%   Syntax:
+%       eff_diffusivity = compute_effective_diffusivity(velocity_results, collision_profiles, r_fine, constants)
+%
+%   Inputs:
+%       velocity_results   - Structure from analyze_velocity_profile.
+%       collision_profiles - Structure from compute_collision_profiles.
+%       r_fine             - The high-resolution radial grid [m].
+%       constants          - The main constants structure.
+%
+%   Output:
+%       eff_diffusivity - A structure containing the mean profile and
+%                         confidence band for chi_phi_eff.
+
+fprintf('Calculating effective momentum diffusivity profile...\n');
+
+% --- 1. Extract Necessary Data ---
+% Coefficient derived from Bessel analysis: [ Sum(1/lambda_j^2) * (3/(4*epsilon) - 1) ]
+% This term is a scalar constant.
+chi_phi_coeff = velocity_results.chi_phi_coeff; % [m^2]
+
+% Ion-neutral collision frequency profiles, including uncertainty bounds
+nu_iH0_avg      = collision_profiles.nu_iH0.avg;
+nu_iH0_ci_lower = collision_profiles.nu_iH0.ci_lower;
+nu_iH0_ci_upper = collision_profiles.nu_iH0.ci_upper;
+
+% --- 2. Calculate Diffusivity Profile and Propagate Uncertainty ---
+% The uncertainty is propagated via simple multiplication of the constant
+% coefficient with the mean and confidence bounds of the collision frequency.
+profile_avg      = chi_phi_coeff * nu_iH0_avg;
+profile_ci_lower = chi_phi_coeff * nu_iH0_ci_lower;
+profile_ci_upper = chi_phi_coeff * nu_iH0_ci_upper;
+
+% --- 3. Package Results into Output Structure ---
+eff_diffusivity.r_fine = r_fine;
+eff_diffusivity.profile_avg = profile_avg;
+eff_diffusivity.ci_lower = profile_ci_lower;
+eff_diffusivity.ci_upper = profile_ci_upper;
+
+fprintf('Effective diffusivity profile calculated successfully.\n\n');
+
+end
+
+function [magnetic_field] = compute_magnetic_field(r_fine, constants)
+%COMPUTE_MAGNETIC_FIELD Calculates the magnetic field profiles.
+%   This function computes the toroidal, poloidal, and total magnetic
+%   field profiles across the minor radius of the tokamak. The poloidal
+%   field calculation is based on the model from Gilson's thesis.
+%
+%   Syntax:
+%       magnetic_field = compute_magnetic_field(r_fine, constants)
+%
+%   Inputs:
+%       r_fine    - The fine radial grid vector [m].
+%       constants - A structure containing all machine and physical parameters.
+%
+%   Output:
+%       magnetic_field - A structure containing the B_tor, B_pol, and B_total profiles.
+
+fprintf('Calculating magnetic field profiles...\n');
+
+% --- Extract necessary parameters ---
+mu0 = constants.physics.mu0;
+Ip  = constants.machine.Ip;
+a   = constants.machine.a;
+R0  = constants.machine.R0;
+B0  = constants.machine.B0;
+
+% --- Calculate Field Components ---
+% Poloidal magnetic field [T] (from Gilson's thesis, Appendix A)
+B_pol = (mu0 * Ip / (2 * pi * a^2)) .* r_fine .* (2 - (r_fine ./ a).^2);
+
+% Toroidal magnetic field [T], considering toroidal effect
+R_coord = R0 * (1 + r_fine / R0);
+B_tor = R0 * B0 ./ R_coord;
+
+% Total magnetic field magnitude [T]
+B_total = sqrt(B_pol.^2 + B_tor.^2);
+
+% --- Package Results into Output Structure ---
+magnetic_field.r_fine   = r_fine;
+magnetic_field.poloidal = B_pol;
+magnetic_field.toroidal = B_tor;
+magnetic_field.total    = B_total;
+
+fprintf('Magnetic field profiles calculated successfully.\n\n');
+
+end
+
+function [neutral_profile] = compute_neutral_density_profile(r_fine, constants)
+%COMPUTE_NEUTRAL_DENSITY_PROFILE Calculates the neutral hydrogen density profile.
+%   This function implements the amplitude version of a Gaussian peak function
+%   to model the neutral particle density (n_H0) profile, as described in
+%   the thesis (Eq. 3.19). The parameters for the model are sourced from the
+%   'constants' structure.
+%
+%   Syntax:
+%       neutral_profile = compute_neutral_density_profile(r_fine, constants)
+%
+%   Inputs:
+%       r_fine    - The high-resolution radial grid [m].
+%       constants - Structure containing model parameters under constants.models.neutrals.
+%
+%   Output:
+%       neutral_profile - A structure containing the n_H0 profile.
+
+fprintf('Calculating neutral particle density profile...\n');
+
+% --- Extract model parameters for clarity ---
+n_H0_c    = constants.models.neutrals.n_H0_centre;
+n_H0_max  = constants.models.neutrals.n_H0_max_amp;
+r_max     = constants.models.neutrals.r_max_H_alpha;
+width     = constants.models.neutrals.width;
+
+% --- Calculate the profile ---
+% This implements the Gaussian peak function from the original monolithic script.
+n_H0_profile = n_H0_c + n_H0_max * exp(-0.5 * ((r_fine - r_max) / width).^2);
+
+% --- Package Results into Output Structure ---
+neutral_profile.r_fine = r_fine;
+neutral_profile.n_H0 = n_H0_profile;
+
+fprintf('Neutral density profile calculated successfully.\n\n');
+
+end
+
+function [theoretical_models] = compute_theoretical_models(temperature_results, magnetic_field, derived_profiles, constants)
+%COMPUTE_THEORETICAL_MODELS Calculates profiles from theoretical transport models.
+%   This function uses previously calculated plasma profiles to compute
+%   theoretical predictions for key transport quantities. It currently
+%   implements the Helander model for toroidal velocity and the Solomon
+%   model for momentum diffusivity and pinch velocity.
+%
+%   Syntax:
+%       theoretical_models = compute_theoretical_models(temp_results, mag_field, derived_profiles, constants)
+%
+%   Inputs:
+%       temperature_results - Structure with fitted Ti profile and parameters.
+%       magnetic_field     - Structure with B-field profiles.
+%       derived_profiles   - Structure with nu_star, R/Ln, etc.
+%       constants          - Structure with all project constants.
+%
+%   Output:
+%       theoretical_models - A structure containing all calculated theoretical profiles.
+
+fprintf('Calculating theoretical transport model profiles...\n');
+
+% --- 1. Extract necessary variables ---
+r_fine      = derived_profiles.r_fine;
+a           = constants.machine.a;
+B_pol       = magnetic_field.poloidal;
+e_charge    = constants.physics.e_charge;
+epsilon = constants.machine.epsilon_aspect_ratio;
+nu_star_e   = derived_profiles.nu_star_e;
+R_over_Ln   = derived_profiles.R_over_Ln;
+
+% --- 2. Helander Model for Toroidal Velocity ---
+% V_phi = (2*epsilon / (e*B_theta)) * (dT_i / dr)
+% The dT_i/dr term is calculated analytically from the fitted canonical profile
+% for maximum accuracy, avoiding numerical differentiation errors.
+fprintf('... calculating Helander velocity profile\n');
+
+% Extract the optimised parameters from the temperature fit
+params_Ti = [temperature_results.params_optimized.T0; ...
+             temperature_results.params_optimized.Ta; ...
+             temperature_results.params_optimized.sigma];
+
+% Analytical derivative of the canonical profile function T_i(r)
+dTi_dr_analytical = analytical_dTi_dr(params_Ti, r_fine, a); % [eV/m]
+delta = 0.0008; % Offset justified by Shafranov shift
+
+% Use the physically-motivated offset for B_pol to avoid singularity
+B_pol_offset  = B_pol + delta; % Offset justified by Shafranov shift
+
+% Calculate the Helander velocity profile in m/s
+% The factor of 'e_charge' is needed to convert d(Ti[eV])/dr to d(Ti[J])/dr
+Vphi_Helander = (2 * epsilon ./ (e_charge * B_pol_offset)) .* (dTi_dr_analytical * e_charge); % [m/s]
+
+
+% --- 3. Solomon Model for Diffusivity and Pinch ---
+% Calculates momentum diffusivity (chi_phi) and pinch velocity (V_pinch)
+% based on the empirical scaling laws from Solomon et al. (2010).
+% chi_phi = A * nu_e* + B * R/Ln
+% V_pinch = C * nu_e*
+fprintf('... calculating Solomon diffusivity and pinch velocity profiles\n');
+
+% Coefficients from Solomon et al. (2010), as cited in the thesis
+A = 6.09; A_err = 0.72;
+B = 0.157; B_err = 0.072;
+C = -24.2; C_err = 3.5;
+
+% --- Pinch Velocity (depends only on nu_star_e) ---
+Vpinch_solo.profile = C * nu_star_e;
+Vpinch_solo.upper_bound = (C + C_err) * nu_star_e;
+Vpinch_solo.lower_bound = (C - C_err) * nu_star_e;
+
+% --- Momentum Diffusivity (calculated for specific, constant R/Ln values) ---
+% This follows the methodology in Solomon (2010) and the original thesis,
+% where chi_phi is examined for characteristic values of R/Ln.
+
+% Case 1: R/Ln = 2 (typical reference value)
+chi_phi_solo_Rln2.profile = A * nu_star_e + B * 2;
+chi_phi_solo_Rln2.upper_bound = (A + A_err) * nu_star_e + (B + B_err) * 2;
+chi_phi_solo_Rln2.lower_bound = (A - A_err) * nu_star_e + (B - B_err) * 2;
+
+% Case 2: R/Ln calculated at r/a = 0.5 (approx. 6 for TCABR)
+% Find the index closest to r/a = 0.5
+[~, idx_mid_radius] = min(abs(r_fine - a*0.5));
+R_over_Ln_mid = R_over_Ln(idx_mid_radius);
+
+% Correct profile and bounds (note the '+' for the B term)
+chi_phi_solo_Rln_calc.profile = A * nu_star_e + B * R_over_Ln_mid;
+chi_phi_solo_Rln_calc.upper_bound = (A + A_err) * nu_star_e + (B + B_err) * R_over_Ln_mid;
+chi_phi_solo_Rln_calc.lower_bound = (A - A_err) * nu_star_e + (B - B_err) * R_over_Ln_mid;
+
+% Ensure bounds are ordered (lower <= upper) element-wise
+tmp_lower = min(chi_phi_solo_Rln_calc.lower_bound, chi_phi_solo_Rln_calc.upper_bound);
+tmp_upper = max(chi_phi_solo_Rln_calc.lower_bound, chi_phi_solo_Rln_calc.upper_bound);
+chi_phi_solo_Rln_calc.lower_bound = tmp_lower;
+chi_phi_solo_Rln_calc.upper_bound = tmp_upper;
+
+% --- 4. Package Results into Output Structure ---
+theoretical_models.Vphi_Helander = Vphi_Helander;
+theoretical_models.chi_phi_solo_Rln2 = chi_phi_solo_Rln2;
+theoretical_models.chi_phi_solo_Rln_calc = chi_phi_solo_Rln_calc;
+theoretical_models.R_over_Ln_mid_value = R_over_Ln_mid; % Store the value used
+theoretical_models.Vpinch_solo = Vpinch_solo;
+
+fprintf('Theoretical model profiles calculated successfully.\n\n');
+end
+
+
+% --- Local Helper Function for Analytical Derivative ---
+function dTi_dr = analytical_dTi_dr(params, r, a)
+    %ANALYTICAL_DTI_DR Calculates the analytical derivative of the canonical Ti profile.
+    T0 = params(1);
+    Ta = params(2);
+    sigma = params(3);
+    
+    % Derivative of T_i(r) = (T0 - Ta) * (1 - (r/a)^2)^sigma + Ta
+    base = 1 - (r ./ a).^2;
+    base(base<0) = 0; % Prevent complex numbers
+    
+    dTi_dr = (T0 - Ta) .* sigma .* (base .^ (sigma - 1)) .* (-2 * r / a^2);
+end
+
+function [exp_data] = load_experimental_data(constants)
+%LOAD_EXPERIMENTAL_DATA Loads and structures the experimental data from TCABR.
+%   This function performs two main tasks:
+%   1. Reads the base profile data (Te, ne, ni, n0) from the text file.
+%   2. Defines the specific, hard-coded experimental data points for
+%      toroidal velocity and ion temperature used in subsequent analyses.
+%
+%   Syntax:
+%       exp_data = load_experimental_data(constants)
+%
+%   Input:
+%       constants - A structure containing file paths and other parameters.
+%
+%   Output:
+%       exp_data - A structure containing all raw and experimental data.
+%   This function reads the raw profile data file. Crucially, it assumes the
+%   first column in the file is a NORMALISED radius and converts it to
+%   physical units (meters) by multiplying by the minor radius 'a'.
+%   It also defines the hard-coded experimental data points for Vphi and Ti.
+
+fprintf('Loading experimental data...\n');
+
+a = constants.machine.a; % Get minor radius for de-normalisation
+
+% --- 1. Load Base Profiles from File ---
+% These are general profiles from the experiment.
+opts = detectImportOptions(constants.data.path, 'FileType', 'text');
+opts.VariableNames = {'r_norm_raw', 'Te', 'Ti_unused', 'ne', 'ni', 'nCI', ...
+    'nCII', 'nCIII', 'nCIV', 'nCV', 'nCVI', 'nCVII', 'n0', 'pi', 'p'};
+opts.DataLines = 2;
+raw_table = readtable(constants.data.path, opts);
+
+% --- CONVERT NORMALISED RADIUS TO PHYSICAL UNITS (METERS) ---
+exp_data.r_profiles = raw_table.r_norm_raw * a; % This is the critical correction
+exp_data.ne_raw = raw_table.ne;         % Raw electron density profile [m^-3]
+exp_data.ni_raw = raw_table.ni;         % Raw ion density profile [m^-3]
+
+fprintf('Base profiles loaded and radial grid converted to meters.\n');
+
+% --- 2. Define Hard-coded Experimental Data Points ---
+% These are the specific, discrete data points used for the primary fits.
+
+% Experimental Toroidal Velocity Data
+exp_data.r_Vphi_exp = [5.02E-04; 0.0104; 0.02036; 0.03026; 0.04009; 0.05005; 0.06001; ...
+    0.06991; 0.07981; 0.08977; 0.10013; 0.11; 0.11989; 0.12985; 0.13966; ...
+    0.14962; 0.15958; 0.1695; 0.17971]; % [m]
+
+exp_data.Vphi_exp = -[21.03307; 24.12041; 25.06326; 27.04137; 25.96912; 24.15739; ...
+    20.05325; 18.62974; 13.1021; 12.529; 10.99457; 8.12907; 8.07361; ...
+    8.0921; 2.9342; -4.0909; 1.99135; 2.89722; 1.10397]; % [km/s]
+
+exp_data.Vphi_err_exp = abs(-[0.94284; 1.81174; 0.90586; 2.01510; 1.44200; 2.34786; ...
+    1.81174; 1.42351; 1.79325; 1.42351; 0.53613; 1.23864; 0.88738; ...
+    0.88738; 3.08734; 1.99660; 4.58480; 3.49406; 3.38314]); % [km/s]
+
+% Experimental Ion Temperature Data (as used in the monolithic script fit)
+exp_data.r_Ti_exp = [0.1021; 4.5631; 6.6125; 10; 12; 14; 16; 17] / 100; % [m]
+exp_data.Ti_exp_raw = [154.3163; 142.5772; 118.2958; 81; 65; 51; 31; 32]; % [eV]
+exp_data.Ti_err_exp_raw = [12.5423; 8.897; 9.7002; 16; 15; 13; 10; 11]; % [eV]
+
+% The monolithic code uses a "reconstructed" version for the fit. We store it here.
+exp_data.Ti_reconstructed_exp = [269.9322956; 212.6290401; 154.5794833; ...
+    94.59042348; 72.86028761; 58.16568356; 30.5396089; 32]; % [eV]
+relative_errors = exp_data.Ti_err_exp_raw ./ exp_data.Ti_exp_raw;
+exp_data.Ti_reconstructed_err_exp = relative_errors .* exp_data.Ti_reconstructed_exp; % [eV]
+
+fprintf('Specific experimental data points defined.\n');
+fprintf('Data loading complete.\n\n');
+
+end
+
+function plot_chi_eff_comparison(diffusivity_results, variants, ~, constants, varargin)
+% PLOT_CHI_EFF_COMPARISON Plot experimental chi_eff and multiple theoretical variants.
+%   plot_chi_eff_comparison(diffusivity_results, variants, scaling_law_results, constants)
+%
+% Inputs:
+%   diffusivity_results - struct with fields .profile_avg, .ci_lower, .ci_upper, .r_fine
+%   variants            - output of compute_chi_eff_variants
+%   scaling_law_results - (optional) original scaling results for extra info
+%   constants           - to extract a, R0, etc.
+
+r = diffusivity_results.r_fine(:);
+r_norm = r ./ constants.machine.a;
+colors = get(groot,'DefaultAxesColorOrder');
+
+figure('Name','χ_φ,eff: Experimental vs Theoretical','Color','w','Position',[100 100 900 600]);
+hold on; grid on; box on;
+
+% Experimental
+plot(r_norm, diffusivity_results.profile_avg, '-o', 'LineWidth', 2, 'MarkerSize', 4, 'Color', colors(1,:));
+if isfield(diffusivity_results,'ci_lower') && isfield(diffusivity_results,'ci_upper')
+    fill([r_norm; flipud(r_norm)], [diffusivity_results.ci_lower; flipud(diffusivity_results.ci_upper)], ...
+        colors(1,:), 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'HandleVisibility','off');
+end
+
+% Plot chi_phi_solo baseline
+plot(r_norm, variants.chi_phi_solo, '-', 'LineWidth', 1.8,'Color', colors(2,:), 'DisplayName','\chi_\phi^{(Solo)} (baseline)');
+
+% Plot R0_mid variants
+fields_mid = fieldnames(variants.chi_eff_R0_mid);
+for k=1:numel(fields_mid)
+    fld = fields_mid{k};
+    data = variants.chi_eff_R0_mid.(fld);
+    plot(r_norm, data, '--', 'LineWidth', 1.6, 'DisplayName', sprintf('\\chi_{eff}^{%s} (R0, mid)', fld));
+end
+
+% Plot R0_profile variants (dashed-dotted)
+fields_prof = fieldnames(variants.chi_eff_R0_profile);
+for k=1:numel(fields_prof)
+    fld = fields_prof{k};
+    data = variants.chi_eff_R0_profile.(fld);
+    plot(r_norm, data, '-.', 'LineWidth', 1.4, 'DisplayName', sprintf('\\chi_{eff}^{%s} (R0, profile)', fld));
+end
+
+% R_local variants
+if isfield(variants,'chi_eff_Rlocal_profile')
+    fields_rl = fieldnames(variants.chi_eff_Rlocal_profile);
+    for k=1:numel(fields_rl)
+        fld = fields_rl{k};
+        data = variants.chi_eff_Rlocal_profile.(fld);
+        plot(r_norm, data, ':', 'LineWidth', 1.6, 'DisplayName', sprintf('\\chi_{eff}^{%s} (R_{local}, profile)', fld));
+    end
+end
+
+% Labels & legend
+xlabel('r/a'); ylabel('\chi_{\phi,eff} [m^2/s]');
+title('Experimental \chi_{\phi,eff} and theoretical variants','Interpreter','latex');
+legend('Location','northwest','Interpreter','tex');
+xlim([0,1]); ylim('auto');
+% Annotate important scalars
+xtext = 0.02; ytext = 0.95 * ylim;
+if isfield(variants,'meta')
+    txt = sprintf('R0=%.3f m, R/L_n(mid)=%.2f, R/L_Vphi(mid)=%.2f', variants.meta.R0, variants.meta.R_over_Ln_mid, variants.meta.R_over_LVphi_mid);
+    text(xtext, ytext(2), txt, 'Units','normalized', 'FontSize', 9, 'BackgroundColor','w', 'EdgeColor','k');
+end
+
+% Save
+savepath = fullfile('results','plots');
+if ~exist(savepath,'dir'), mkdir(savepath); end
+saveas(gcf, fullfile(savepath,'chi_eff_comparison.png'));
+hold off;
+end
+
+
+function plot_diffusivity_comparison(effective_diffusivity_thesis, scaling_law_results, constants, r_fine)
+%PLOT_DIFFUSIVITY_COMPARISON Plots the comparison of effective diffusivity profiles.
+%   This function generates the key comparison plot, confronting the effective
+%   diffusivity calculated via the thesis method with the various profiles
+%   derived from theoretical scaling laws (Solomon, Hahm, Gürcan, Peeters).
+
+fprintf('Generating final diffusivity comparison plot...\n');
+
+r_norm = r_fine / constants.machine.a;
+
+figure('Name', 'Comparison of Effective Diffusivity Models');
+hold on; grid on; box on;
+
+% --- 1. Plot the Effective Diffusivity from the Thesis Method ---
+eff_thesis = effective_diffusivity_thesis;
+h_fill = fill([r_norm; flipud(r_norm)], [eff_thesis.ci_lower; flipud(eff_thesis.ci_upper)], ...
+    'c', 'FaceAlpha', 0.3, 'EdgeColor', 'none', 'DisplayName', '95% CI (Thesis Method)');
+h_main = plot(r_norm, eff_thesis.profile_avg, 'b-', 'LineWidth', 3, 'DisplayName', '\chi_{\phi, thesis}^{eff}');
+
+
+% --- 2. Plot the Effective Diffusivity Profiles from Scaling Laws ---
+h_solo = plot(r_norm, scaling_law_results.chi_eff_Solo, '--', 'LineWidth', 2, 'DisplayName', '\chi_{\phi, Solomon}^{eff}');
+h_hahm = plot(r_norm, scaling_law_results.chi_eff_Hahm, ':', 'LineWidth', 2, 'DisplayName', '\chi_{\phi, Hahm}^{eff}');
+h_gurc = plot(r_norm, scaling_law_results.chi_eff_Gurcan, '-.', 'LineWidth', 2, 'DisplayName', '\chi_{\phi, Gürcan}^{eff}');
+h_peet = plot(r_norm, scaling_law_results.chi_eff_Peeters_Rln_calc, 'd-', 'MarkerSize', 3, 'DisplayName', '\chi_{\phi, Peeters}^{eff}');
+
+% --- 3. Final Plot Formatting ---
+xlabel('Normalised Radius (r/a)');
+ylabel('Effective Diffusivity, \chi_{\phi}^{eff} [m^2/s]');
+title('Comparison: Thesis Method vs. Scaling Law Models');
+xlim([0, 1]); ylim([0, 25]);
+legend('show', 'Location', 'northwest');
+hold off;
+
+fprintf('Final comparison plot generated.\n\n');
+
+end
+
+function plot_stage1_justification_and_fits(constants, exp_data, velocity_results, temperature_results, theoretical_models, r_fine)
+%PLOT_STAGE1_JUSTIFICATION_AND_FITS Generates plots for the primary fits and theoretical justification.
+%   This function creates three key figures that replicate the narrative of the thesis:
+%   1. The canonical fit of the ion temperature profile.
+%   2. The comparison of the Helander model against experimental velocity data, which
+%      justifies the theoretical approach of the thesis.
+%   3. The full analysis of the velocity profile, including the Fourier-Bessel fit.
+
+fprintf('Plotting Stage 1: Justification and Primary Fits...\n');
+
+r_norm = r_fine / constants.machine.a;
+
+% --- Figure 1: Ion Temperature Profile Analysis (Matches Thesis Fig. 3.6) ---
+fig1 = figure('Name', 'Ion Temperature Profile Analysis');
+ax1 = gca;
+hold(ax1, 'on');
+
+errorbar(ax1, exp_data.r_Ti_exp / constants.machine.a, exp_data.Ti_reconstructed_exp, ...
+    exp_data.Ti_reconstructed_err_exp, 'ko', 'MarkerFaceColor', 'k', ...
+    'MarkerSize', 8, 'LineWidth', 1.5, 'DisplayName', 'Experimental Data');
+plot(ax1, r_norm, temperature_results.profile_avg, 'r-', 'LineWidth', 4, 'DisplayName', 'Canonical fit');
+fill(ax1, [r_norm; flipud(r_norm)], [temperature_results.profile_ci_lower; flipud(temperature_results.profile_ci_upper)], ...
+    'r', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', '95\% Confidence Band');
+    
+xlabel(ax1, 'Normalised Radius ($r/a$)');
+ylabel(ax1, 'Ion Temperature, $T_{i}$ (eV)');
+title(ax1, 'Ion Temperature Profile Analysis');
+xlim(ax1, [0, 1]);
+legend(ax1, 'show', 'Location', 'northeast');
+set_publication_style(ax1); % Apply standard style
+hold(ax1, 'off');
+
+
+% --- Figure 2: Helander Model Justification (Matches Thesis Fig. 3.4) ---
+fig2 = figure('Name', 'Helander Model Justification');
+ax2 = gca;
+hold(ax2, 'on');
+
+% NOTE: Signs are flipped for visual comparison, as in the thesis figure.
+h1 = errorbar(ax2, exp_data.r_Vphi_exp / constants.machine.a, -exp_data.Vphi_exp, ...
+    exp_data.Vphi_err_exp, 'ko', 'MarkerFaceColor', 'k', 'MarkerSize', 8, ...
+    'LineWidth', 1.5, 'DisplayName', 'Experimental data');
+h2 = fill(ax2, [r_norm; flipud(r_norm)], [-velocity_results.poly_fit_ci_upper / 1000; -flipud(velocity_results.poly_fit_ci_lower / 1000)], ...
+    'g', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', '95\% Confidence interval');
+h3 = plot(ax2, r_norm, -velocity_results.poly_fit_avg / 1000, 'g--', 'LineWidth', 5, 'DisplayName', '5th-order polynomial fit');
+h4 = plot(ax2, r_norm, -theoretical_models.Vphi_Helander / 1000, 'r-', 'LineWidth', 4, 'DisplayName', 'Helander model');
+
+yline(ax2, 0, '--', 'HandleVisibility', 'off'); % Added y=0 line
+
+xlabel(ax2, 'Normalised Radius ($r/a$)');
+ylabel(ax2, 'Toroidal Velocity, $V_{\phi}$ (km/s)');
+title(ax2, 'Comparison with Helander Model');
+legend(ax2, [h1, h3, h2, h4], 'Location', 'best');
+xlim(ax2, [0, 1]); ylim(ax2, [-10, 30]);
+set_publication_style(ax2); % Apply standard style
+hold(ax2, 'off');
+
+
+% --- Figure 3: Velocity Profile Analysis (Matches Thesis Fig. 3.5) ---
+fig3 = figure('Name', 'Velocity Profile Analysis');
+ax3 = gca;
+hold(ax3, 'on');
+
+% NOTE: Original (negative) velocity data is plotted here.
+errorbar(ax3, exp_data.r_Vphi_exp / constants.machine.a, -exp_data.Vphi_exp, ...
+    exp_data.Vphi_err_exp, 'ko', 'MarkerFaceColor', 'k', 'MarkerSize', 8, ...
+    'LineWidth', 1.5, 'DisplayName', 'Experimental Data');
+plot(ax3, r_norm, -velocity_results.poly_fit_avg / 1000, 'g--', 'LineWidth', 6, 'DisplayName', '5th-order polynomial fit');
+fill(ax3, [r_norm; flipud(r_norm)], [-velocity_results.poly_fit_ci_lower / 1000; flipud(-velocity_results.poly_fit_ci_upper / 1000)], ...
+    'g', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', '95\% Confidence interval');
+plot(ax3, r_norm, -velocity_results.bessel_fit / 1000, 'r-', 'LineWidth', 4, 'DisplayName', 'Fourier-Bessel series fit');
+
+yline(ax3, 0, '--', 'HandleVisibility', 'off'); % Added y=0 line
+
+xlabel(ax3, 'Normalised Radius ($r/a$)');
+ylabel(ax3, 'Toroidal Velocity, $V_{\phi}$ (km/s)');
+title(ax3, 'Velocity Profile Fourier-Bessel Analysis');
+xlim(ax3, [0, 1]); ylim(ax3, [-10, 30]);
+legend(ax3, 'show', 'Location', 'best');
+set_publication_style(ax3); % Apply standard style
+hold(ax3, 'off');
+
+end
+
+function plot_stage2_thesis_method(constants, neutral_profile, collision_profiles, effective_diffusivity_thesis, r_fine)
+%PLOT_STAGE2_THESIS_METHOD Generates plots detailing the thesis's core method results.
+%   This function creates two figures, each with two side-by-side subplots,
+%   to clearly visualise the components and the final result of the thesis's
+%   method for calculating effective diffusivity. This layout replaces the
+%   previous inset plot style as requested.
+
+fprintf('Plotting Stage 2: Thesis Method Results (Side-by-Side Layout)...\n');
+
+r_norm = r_fine / constants.machine.a;
+orange_color = [217, 83, 25] / 255; % '#D95319'
+
+% --- Figure 1: Neutral Density & CX Rate (Side-by-Side) ---
+fig1 = figure('Name', 'Neutral Density and CX Rate (Side-by-Side)', ...
+              'Units', 'normalized', 'OuterPosition', [0.1 0.1 .8 .8]); % Adjust size/position
+fig1.Position(3) = fig1.Position(3) * 1; % Widen the figure
+
+% Subplot 1: Neutral Density Profile (Matches Thesis Fig. 3.7 Main)
+ax1_left = subplot(1, 2, 1);
+hold(ax1_left, 'on');
+plot(ax1_left, r_norm, neutral_profile.n_H0 / 1e16, 'LineWidth', 5, 'Color', orange_color, ...
+     'DisplayName', 'Neutral particles density');
+yline(ax1_left, 0, '--', 'HandleVisibility', 'off');
+grid(ax1_left, 'on');
+xlabel(ax1_left, 'Normalised Radius ($r/a$)');
+ylabel(ax1_left, '$n_{H0}$ ($\times10^{16}$ m$^{-3}$)', 'Interpreter', 'latex');
+title(ax1_left, 'Neutral Density Profile');
+xlim(ax1_left, [0, 1]); ylim(ax1_left, [0, 3]);
+xticks(ax1_left, 0:0.2:1); yticks(ax1_left, 0:1:3);
+legend(ax1_left, 'show', 'Location', 'southeast');
+set_publication_style(ax1_left);
+hold(ax1_left, 'off');
+
+% Subplot 2: CX Rate Coefficient (Matches Thesis Fig. 3.7 Inset)
+ax1_right = subplot(1, 2, 2);
+hold(ax1_right, 'on');
+cx_rate = collision_profiles.cx_rate;
+fill(ax1_right, [r_norm; flipud(r_norm)], [cx_rate.ci_lower; flipud(cx_rate.ci_upper)] * 1e8, ...
+    orange_color, 'FaceAlpha', 0.3, 'EdgeColor', 'none', 'DisplayName', '95% Confidence band');
+plot(ax1_right, r_norm, cx_rate.avg * 1e8, 'LineWidth', 3.5, 'Color', orange_color, ...
+     'DisplayName', 'Reaction rate coefficient');
+grid(ax1_right, 'on');
+xlabel(ax1_right, 'Normalised Radius ($r/a$)');
+ylabel(ax1_right, '$\langle \sigma v \rangle_{cx}$ ($\times10^{-8}$ cm$^3$/s)', 'Interpreter', 'latex');
+title(ax1_right, 'CX Rate Coefficient');
+xlim(ax1_right, [0, 1]); ylim(ax1_right, [2, 7]);
+xticks(ax1_right, 0:0.2:1); yticks(ax1_right, 2:1:7);
+legend(ax1_right, 'show', 'Location', 'southwest');
+set_publication_style(ax1_right);
+hold(ax1_right, 'off');
+
+% --- Figure 2: Effective Diffusivity & Collision Freq. (Side-by-Side) ---
+fig2 = figure('Name', 'Effective Diffusivity and Collision Frequency (Side-by-Side)', ...
+              'Units', 'normalized', 'OuterPosition', [0.1 0.1 .8 .8]);
+fig2.Position(3) = fig2.Position(3) * 1; % Widen the figure
+
+% Subplot 1: Ion-Neutral Collision Frequency (Matches Thesis Fig. 3.8 Inset)
+ax2_right = subplot(1, 2, 1);
+hold(ax2_right, 'on');
+nu_iH0 = collision_profiles.nu_iH0;
+fill(ax2_right, [r_norm; flipud(r_norm)], [nu_iH0.ci_lower / 1e3; flipud(nu_iH0.ci_upper / 1e3)], ...
+    orange_color, 'FaceAlpha', 0.3, 'EdgeColor', 'none', 'DisplayName', '95% Confidence band');
+plot(ax2_right, r_norm, nu_iH0.avg / 1e3, 'LineWidth', 3.5, 'Color', orange_color, ...
+     'DisplayName', 'Collision frequency');
+grid(ax2_right, 'on');
+xlabel(ax2_right, 'Normalised Radius ($r/a$)');
+ylabel(ax2_right, 'Collision Frequency, $\nu_{iH0}$ ($\times10^3$ s$^{-1}$)');
+title(ax2_right, 'Ion-Neutral Collision Frequency');
+xlim(ax2_right, [0, 1]); ylim(ax2_right, [0, 1]);
+xticks(ax2_right, 0:0.2:1); yticks(ax2_right, 0:0.5:1);
+legend(ax2_right, 'show', 'Location', 'northwest');
+set_publication_style(ax2_right);
+hold(ax2_right, 'off');
+
+% Subplot 2: Effective Diffusivity (Matches Thesis Fig. 3.8 Main)
+ax2_left = subplot(1, 2, 2);
+hold(ax2_left, 'on');
+eff_thesis = effective_diffusivity_thesis;
+fill(ax2_left, [r_norm; flipud(r_norm)], [eff_thesis.ci_lower; flipud(eff_thesis.ci_upper)], ...
+    [0, 222/255, 230/255], 'FaceAlpha', 0.55, 'EdgeColor', 'none', 'DisplayName', '95% Confidence Band');
+plot(ax2_left, r_norm, eff_thesis.profile_avg, 'LineWidth', 4, 'Color', [0, 0.2470, 0.5410], ...
+     'DisplayName', 'Mean effective diffusivity');
+yline(ax2_left, 0, '--', 'HandleVisibility', 'off');
+grid(ax2_left, 'on');
+xlabel(ax2_left, 'Normalised Radius ($r/a$)');
+ylabel(ax2_left, 'Effective Diffusivity, $\chi_{\phi}^{eff}$ [m$^2$/s]');
+title(ax2_left, 'Effective Momentum Diffusivity');
+xlim(ax2_left, [0, 1]); ylim(ax2_left, [0, 10]);
+xticks(ax2_left, 0:0.2:1); yticks(ax2_left, 0:5:10);
+legend(ax2_left, 'show', 'Location', 'northwest');
+set_publication_style(ax2_left);
+hold(ax2_left, 'off');
+
+end
+
+function plot_stage3_supporting_profiles(constants, derived_profiles, r_fine)
+%PLOT_STAGE3_SUPPORTING_PROFILES Generates consolidated plots of supporting physics profiles.
+%   Creates two figures:
+%   1. Fundamental & Dimensionless Profiles (Thermal Vel, Coulomb Log, q, s, nu*).
+%   2. Collision Metrics (Collision Times and Frequencies), replicating the
+%      layout of Thesis Figure B.4.
+
+fprintf('Plotting Stage 3: Supporting Physics Profiles...\n');
+
+r_norm = r_fine / constants.machine.a;
+default_colors = get(groot, 'DefaultAxesColorOrder'); % Get default color sequence
+
+% --- Figure 1: Fundamental and Dimensionless Quantities ---
+fig1 = figure('Name', 'Fundamental and Dimensionless Profiles', ...
+              'Units', 'normalized', 'OuterPosition', [0.1 0.1 0.8 0.8]);
+
+% Subplot (a): Thermal Velocities
+ax1a = subplot(2, 2, 1);
+hold(ax1a, 'on'); grid(ax1a, 'on'); box(ax1a, 'on');
+yyaxis(ax1a, 'left');
+plot(ax1a, r_norm, derived_profiles.v_th_e, '-', 'LineWidth', 3, 'Color', default_colors(1,:));
+ylabel(ax1a, 'Electron Thermal Velocity, $v_{th,e}$ (m/s)');
+ylim(ax1a, [0, 2e7]);
+ax1a.YColor = default_colors(1,:);
+yyaxis(ax1a, 'right');
+plot(ax1a, r_norm, derived_profiles.v_th_i, '-', 'LineWidth', 3, 'Color', default_colors(2,:));
+ylabel(ax1a, 'Ion Thermal Velocity, $v_{th,i}$ (m/s)');
+ylim(ax1a, [0, 3e5]);
+ax1a.YColor = default_colors(2,:);
+xlabel(ax1a, 'Normalised Radius ($r/a$)');
+title(ax1a, '(a) Thermal Velocities'); xlim(ax1a, [0, 1]);
+set_publication_style(ax1a);
+hold(ax1a, 'off');
+
+% Subplot (b): Coulomb Logarithms
+ax1b = subplot(2, 2, 2);
+hold(ax1b, 'on'); grid(ax1b, 'on'); box(ax1b, 'on');
+plot(ax1b, r_norm, derived_profiles.ln_lambda_ee, 'LineWidth', 3, 'DisplayName', '$\lambda_{ee}$', 'Color', default_colors(1,:));
+plot(ax1b, r_norm, derived_profiles.ln_lambda_ei, 'LineWidth', 3, 'DisplayName', '$\lambda_{ei}$', 'Color', default_colors(2,:));
+plot(ax1b, r_norm, derived_profiles.ln_lambda_ii, 'LineWidth', 3, 'DisplayName', '$\lambda_{ii}$', 'Color', default_colors(3,:));
+xlabel(ax1b, 'Normalised Radius ($r/a$)'); ylabel(ax1b, 'Coulomb Logarithm, $\lambda = \ln\Lambda$');
+title(ax1b, '(b) Coulomb Logarithms'); xlim(ax1b, [0, 1]); ylim(ax1b, [13, 17]); % Match thesis scale
+legend(ax1b, 'show', 'Location', 'best');
+set_publication_style(ax1b);
+hold(ax1b, 'off');
+
+% Subplot (c): Safety Factor (q) and Magnetic Shear (s)
+ax1c = subplot(2, 2, 3);
+hold(ax1c, 'on'); grid(ax1c, 'on'); box(ax1c, 'on');
+plot(ax1c, r_norm, derived_profiles.q_profile, '-', 'LineWidth', 3, 'DisplayName', 'Safety Factor $q$', 'Color', default_colors(1,:));
+plot(ax1c, r_norm, derived_profiles.s_profile, '--', 'LineWidth', 3, 'DisplayName', 'Magnetic Shear $s$', 'Color', default_colors(2,:));
+xlabel(ax1c, 'Normalised Radius ($r/a$)'); ylabel(ax1c, '$q, s$');
+title(ax1c, '(c) Safety Factor and Shear'); xlim(ax1c, [0, 1]); ylim(ax1c, [0, 4]);
+legend(ax1c, 'show', 'Location', 'best');
+set_publication_style(ax1c);
+hold(ax1c, 'off');
+
+% Subplot (d): Collisionality
+ax1d = subplot(2, 2, 4);
+hold(ax1d, 'on'); grid(ax1d, 'on'); box(ax1d, 'on');
+plot(ax1d, r_norm, derived_profiles.nu_star_i, '-', 'LineWidth', 3, 'DisplayName', 'Ion Collisionality ($\nu_{*i}$)', 'Color', default_colors(1,:));
+plot(ax1d, r_norm, derived_profiles.nu_star_e, '--', 'LineWidth', 3, 'DisplayName', 'Electron Collisionality ($\nu_{*e}$)', 'Color', default_colors(2,:));
+xlabel(ax1d, 'Normalised Radius ($r/a$)'); ylabel(ax1d, 'Collisionality, $\nu_*$');
+title(ax1d, '(d) Collisionality Profiles'); xlim(ax1d, [0, 1]); ylim(ax1d, [0, 4]);
+legend(ax1d, 'show', 'Location', 'best');
+set_publication_style(ax1d);
+hold(ax1d, 'off');
+
+
+% --- Figure 2: Collision Metrics (Recreates Thesis Fig B.4 Layout) ---
+fig2 = figure('Name', 'Collision Metrics (Thesis Fig B.4 Layout)', ...
+              'Units', 'normalized', 'OuterPosition', [0.1 0.1 0.8 0.8]);
+
+% Subplot (a): Electron Collision Time
+ax2a = subplot(2, 2, 1);
+hold(ax2a, 'on'); grid(ax2a, 'on'); box(ax2a, 'on');
+plot(ax2a, r_norm, derived_profiles.tau_e_calc, '--', 'LineWidth', 3.5, 'DisplayName', '$\tau_e (\lambda_{ei,calc})$', 'Color', default_colors(1,:));
+plot(ax2a, r_norm, derived_profiles.tau_e_15, '-', 'LineWidth', 4.5, 'DisplayName', '$\tau_e (\lambda = 15)$', 'Color', default_colors(2,:));
+plot(ax2a, r_norm, derived_profiles.tau_e_17, '-.', 'LineWidth', 3.5, 'DisplayName', '$\tau_e (\lambda = 17)$', 'Color', default_colors(3,:));
+xlabel(ax2a, '$r/a$', 'Interpreter', 'latex');
+ylabel(ax2a, '$\tau_e$ [s]', 'Interpreter', 'latex');
+title(ax2a, '(a) Electron Collision Time'); xlim(ax2a, [0, 1]); ylim(ax2a, [0, 2e-5]); % Match thesis scale
+legend(ax2a, 'show', 'Location', 'best');
+set_publication_style(ax2a);
+hold(ax2a, 'off');
+
+% Subplot (b): Ion Collision Time
+ax2b = subplot(2, 2, 2);
+hold(ax2b, 'on'); grid(ax2b, 'on'); box(ax2b, 'on');
+plot(ax2b, r_norm, derived_profiles.tau_i_calc, '--', 'LineWidth', 3.5, 'DisplayName', '$\tau_i (\lambda_{ii,calc})$', 'Color', default_colors(1,:));
+plot(ax2b, r_norm, derived_profiles.tau_i_15, '-', 'LineWidth', 4.5, 'DisplayName', '$\tau_i (\lambda = 15)$', 'Color', default_colors(2,:));
+plot(ax2b, r_norm, derived_profiles.tau_i_17, '-.', 'LineWidth', 3.5, 'DisplayName', '$\tau_i (\lambda = 17)$', 'Color', default_colors(3,:));
+xlabel(ax2b, '$r/a$', 'Interpreter', 'latex');
+ylabel(ax2b, '$\tau_i$ [s]', 'Interpreter', 'latex');
+title(ax2b, '(b) Ion Collision Time'); xlim(ax2b, [0, 1]); ylim(ax2b, [0, 4e-4]); % Match thesis scale
+legend(ax2b, 'show', 'Location', 'best');
+set_publication_style(ax2b);
+hold(ax2b, 'off');
+
+% Subplot (c): Electron Collision Frequency
+ax2c = subplot(2, 2, 3);
+hold(ax2c, 'on'); grid(ax2c, 'on'); box(ax2c, 'on');
+
+% Use the frequencies computed directly and those derived from tau (calc)
+% Ensure fields exist, otherwise skip gracefully
+if isfield(derived_profiles, 'nu_ei_15')
+    plot(ax2c, r_norm, derived_profiles.nu_ei_15 / 1e5, '-', 'LineWidth', 3.5, 'DisplayName', '$\nu_{e} (\lambda = 15)$', 'Color', default_colors(2,:));
+end
+% plot the 'calculated' version: 1./tau_e_calc (if present)
+if isfield(derived_profiles, 'tau_e_calc')
+    plot(ax2c, r_norm, (1 ./ derived_profiles.tau_e_calc) / 1e5, '--', 'LineWidth', 3, 'DisplayName', '$\nu_{e} (\lambda_{ei,calc})$', 'Color', default_colors(1,:));
+end
+
+xlabel(ax2c, '$r/a$', 'Interpreter', 'latex');
+ylabel(ax2c, '$\nu_e$ [$\times10^5$ s$^{-1}$]', 'Interpreter', 'latex');
+title(ax2c, '(c) Electron Collision Frequency'); xlim(ax2c, [0, 1]); ylim(ax2c, [0, 6]); % adjust if required
+legend(ax2c, 'show', 'Location', 'best');
+set_publication_style(ax2c);
+hold(ax2c, 'off');
+
+% Subplot (d): Ion Collision Frequency
+ax2d = subplot(2, 2, 4);
+hold(ax2d, 'on'); grid(ax2d, 'on'); box(ax2d, 'on');
+
+% Plot nu_i for lambda = 15 if available (use nu_i_15)
+if isfield(derived_profiles, 'nu_i_15')
+    plot(ax2d, r_norm, derived_profiles.nu_i_15 / 1e3, '-', 'LineWidth', 3.5, 'DisplayName', '$\nu_{i} (\lambda = 15)$', 'Color', default_colors(2,:));
+end
+% Plot calculated nu_i from tau_i_calc (1./tau_i_calc)
+if isfield(derived_profiles, 'tau_i_calc')
+    plot(ax2d, r_norm, (1 ./ derived_profiles.tau_i_calc) / 1e3, '--', 'LineWidth', 3, 'DisplayName', '$\nu_{i} (\lambda_{ii,calc})$', 'Color', default_colors(1,:));
+end
+
+xlabel(ax2d, '$r/a$', 'Interpreter', 'latex');
+ylabel(ax2d, '$\nu_i$ [$\times10^3$ s$^{-1}$]', 'Interpreter', 'latex');
+title(ax2d, '(d) Ion Collision Frequency'); xlim(ax2d, [0, 1]); ylim(ax2d, [0, 16]); % adjust if required
+legend(ax2d, 'show', 'Location', 'best');
+set_publication_style(ax2d);
+hold(ax2d, 'off');
+
+
+end
+
+function plot_stage4_final_comparison(effective_diffusivity_thesis, scaling_law_results, constants, r_fine)
+% Simple plot: overlays experimental effective diffusivity and theory curves.
+% Assumes fields exist:
+% - effective_diffusivity_thesis.profile_avg (or .chi_eff_profile)
+% - scaling_law_results.chi_phi_solo
+% - scaling_law_results.chi_eff_Solo, _Hahm, _Gurcan, _Peeters_Rln2, _Peeters_Rln_calc
+
+% Normalise radius
+a = constants.machine.a;
+r_norm = r_fine(:) / a;
+
+% Fetch experimental profile (support both names)
+if isfield(effective_diffusivity_thesis,'chi_eff_profile')
+    chi_exp = effective_diffusivity_thesis.chi_eff_profile(:);
+elseif isfield(effective_diffusivity_thesis,'profile_avg')
+    chi_exp = effective_diffusivity_thesis.profile_avg(:);
+else
+    chi_exp = [];
+end
+
+% Theoretical curves (assume existence)
+chi_phi_solo = scaling_law_results.chi_phi_solo(:);
+chi_eff_Solo  = scaling_law_results.chi_eff_Solo(:);
+chi_eff_Hahm  = scaling_law_results.chi_eff_Hahm(:);
+chi_eff_Gurcan= scaling_law_results.chi_eff_Gurcan(:);
+chi_eff_Peet2 = scaling_law_results.chi_eff_Peeters_Rln2(:);
+chi_eff_PeetC = scaling_law_results.chi_eff_Peeters_Rln_calc(:);
+
+% Basic plotting (single axes)
+figure('Name','Final Comparison: Experimental vs Theoretical','NumberTitle','off','Color','w','Position',[100 100 900 600]);
+hold on; grid on; box on;
+
+% Colours (default cycle)
+cols = get(groot,'DefaultAxesColorOrder');
+
+% Plot experimental (if present)
+if ~isempty(chi_exp)
+    plot(r_norm, chi_exp, 'o-','Color',cols(1,:),'MarkerFaceColor',cols(1,:),'LineWidth',1.4,'DisplayName','\chi_{eff}^{(Exp)}');
+end
+
+% Plot theory
+plot(r_norm, chi_phi_solo, '-', 'Color', cols(2,:), 'LineWidth', 1.8, 'DisplayName','\chi_{\phi}^{(Solo)}');
+plot(r_norm, chi_eff_Solo,  '--','Color', cols(3,:), 'LineWidth', 1.6, 'DisplayName','\chi_{eff}^{(Solo)}');
+plot(r_norm, chi_eff_Hahm,  '-.','Color', cols(4,:), 'LineWidth', 1.6, 'DisplayName','\chi_{eff}^{(Hahm)}');
+plot(r_norm, chi_eff_Gurcan,':','Color', cols(5,:), 'LineWidth', 1.6, 'DisplayName','\chi_{eff}^{(Gurcan)}');
+plot(r_norm, chi_eff_Peet2, '-', 'Color', cols(6,:), 'LineWidth', 1.4, 'DisplayName','\chi_{eff}^{(Peeters, R/L_n=2)}');
+plot(r_norm, chi_eff_PeetC, '--','Color', cols(7,:), 'LineWidth', 1.4, 'DisplayName',sprintf('\\chi_{eff}^{(Peeters, R/L_n=%.2f)}', scaling_law_results.R_over_Ln_const));
+
+xlabel('r/a','Interpreter','latex'); 
+ylabel('\chi_{\phi} [m^2/s]','Interpreter','latex');
+title('Experimental vs Theoretical Effective Momentum Diffusivity','Interpreter','latex');
+legend('Location','northwest','Interpreter','latex');
+xlim([0 1]); 
+set(gca,'FontSize',12);
+
+% Save figure
+% save_dir = fullfile('results','plots');
+% if ~exist(save_dir,'dir'), mkdir(save_dir); end
+% saveas(gcf, fullfile(save_dir,'stage4_final_comparison_simple.png'));
+
+end
+
+function set_publication_style(ax)
+%SET_PUBLICATION_STYLE Applies a standardised, publication-quality style to an axes object.
+%   This function configures font sizes, line widths, interpreters, and other
+%   graphical properties to ensure a consistent and professional appearance
+%   across all generated figures.
+%
+%   Syntax:
+%       set_publication_style(ax)
+%
+%   Input:
+%       ax - The axes handle to be styled (e.g., from gca).
+
+    set(ax, ...
+        'FontSize', 24, ...                         % Set main font size for labels
+        'TickLabelInterpreter', 'latex', ...          % Render tick labels using LaTeX
+        'XMinorTick', 'on', ...                       % Enable minor ticks on x-axis
+        'YMinorTick', 'on', ...                       % Enable minor ticks on y-axis
+        'LineWidth', 1.5, ...                       % Set thickness of axis lines and ticks
+        'Box', 'on', ...                            % Ensure the plot box is drawn
+        'FontName', 'Times New Roman');             % Use a standard serif font
+
+    % Style the title and labels
+    ax.Title.Interpreter = 'latex';
+    ax.XLabel.Interpreter = 'latex';
+    ax.YLabel.Interpreter = 'latex';
+    
+    % Style the legend, if it exists
+    if ~isempty(ax.Legend)
+        ax.Legend.Interpreter = 'latex';
+        ax.Legend.FontSize = 22;
+        box(ax.Legend, 'off');
+    end
+end
+
+function nu_iH0 = compute_nu_iH0_from_nH0(n_H0, Ti_profiles_or_temp_results, ~, r_fine)
+% COMPUTE_NU_IH0_FROM_NH0
+%   Lightweight wrapper that produces ion-neutral collision frequency (nu_iH0)
+%   from a neutral density profile n_H0(r). Internally it calls the existing
+%   compute_collision_profiles(...) function so that all sanitisation and
+%   percentile logic remains centralized.
+%
+% USAGE
+%   nu_iH0 = compute_nu_iH0_from_nH0(n_H0, Ti_profiles_or_temp_results, constants, r_fine)
+%
+% INPUTS
+%   n_H0                       - neutral density profile (n_r x 1) [m^-3]
+%   Ti_profiles_or_temp_results- either:
+%                                   * the full temperature_results struct (preferred), or
+%                                   * a numeric Ti vector (n_r x 1) in eV, or
+%                                   * a small struct with .profile_avg or .bootstrap.all_fitted_profiles
+%   constants                  - project constants struct (passed to compute_collision_profiles)
+%   r_fine                     - radial grid (n_r x 1) [m]
+%
+% OUTPUT
+%   nu_iH0                     - struct with fields:
+%                                   .avg      (n_r x 1)
+%                                   .ci_lower (n_r x 1)
+%                                   .ci_upper (n_r x 1)
+%
+% NOTES
+%   - If only a single Ti profile is provided, the wrapper creates a
+%     single-sample bootstrap input so that compute_collision_profiles
+%     returns percentile fields (they will be equal to the mean).
+%   - This wrapper intentionally does not duplicate the collision logic:
+%     it adapts inputs and extracts nu_iH0 from compute_collision_profiles.
+%
+% Author: ChatGPT (adapted to user's codebase)
+% Date: 2025
+
+% ---- Basic checks and shape normalisation --------------------------------
+if nargin < 4
+    error('compute_nu_iH0_from_nH0 requires 4 inputs: n_H0, Ti_profiles_or_temp_results, constants, r_fine.');
+end
+
+n_H0 = double(n_H0(:));
+r_fine = double(r_fine(:));
+n_r = numel(r_fine);
+
+if numel(n_H0) ~= n_r
+    error('Length mismatch: n_H0 (length %d) must match r_fine (length %d).', numel(n_H0), n_r);
+end
+
+% ---- Prepare temperature_results in the expected form ----------------------
+temp_in = Ti_profiles_or_temp_results;
+
+% If user passed numeric Ti vector, create minimal temperature_results with one bootstrap sample
+if isnumeric(temp_in) && isvector(temp_in)
+    if numel(temp_in) ~= n_r
+        error('Numeric Ti vector must have length equal to r_fine (%d).', n_r);
+    end
+    temperature_results = struct();
+    % compute_collision_profiles expects bootstrap.all_fitted_profiles sized (iterations x points)
+    temperature_results.bootstrap.all_fitted_profiles = double(temp_in(:)).'; % 1 x n_r
+elseif isstruct(temp_in)
+    temperature_results = temp_in;
+    % If profile_avg present but no bootstrap, produce single sample bootstrap
+    if isfield(temperature_results, 'profile_avg') && (~isfield(temperature_results,'bootstrap') || ~isfield(temperature_results.bootstrap,'all_fitted_profiles'))
+        temperature_results.bootstrap.all_fitted_profiles = double(temperature_results.profile_avg(:)).';
+    end
+else
+    error('Ti_profiles_or_temp_results must be a struct or numeric vector of length %d.', n_r);
+end
+
+% ---- Construct neutral_profile expected by compute_collision_profiles -----
+neutral_profile = struct();
+neutral_profile.n_H0 = n_H0(:);
+
+% ---- Call compute_collision_profiles and extract nu_iH0 -------------------
+try
+    collision_profiles = compute_collision_profiles(temperature_results, neutral_profile, r_fine);
+catch ME
+    error('compute_collision_profiles failed. Message: %s', ME.message);
+end
+
+if ~isfield(collision_profiles, 'nu_iH0')
+    error('compute_collision_profiles did not return collision_profiles.nu_iH0 as expected.');
+end
+
+nu_iH0 = collision_profiles.nu_iH0;
+
+% Force column vectors and double type
+nu_iH0.avg      = double(nu_iH0.avg(:));
+nu_iH0.ci_lower = double(nu_iH0.ci_lower(:));
+nu_iH0.ci_upper = double(nu_iH0.ci_upper(:));
+
+% Final sanity check
+if any([numel(nu_iH0.avg), numel(nu_iH0.ci_lower), numel(nu_iH0.ci_upper)] ~= n_r)
+    error('Output nu_iH0 fields must each have length equal to r_fine (%d).', n_r);
+end
+
+end
+
+function zeros_bessel = findBesselZeros(n, order)
+%FINDBESSELZEROS Finds the first n zeros of a Bessel function of a given order.
+%   This function is a utility to calculate the zeros required for the
+%   Fourier-Bessel series expansion.
+%
+%   Syntax:
+%       zeros_bessel = findBesselZeros(n, order)
+%
+%   Inputs:
+%       n     - The number of zeros to find.
+%       order - The order of the Bessel function (e.g., 0 for J0).
+%
+%   Output:
+%       zeros_bessel - A vector containing the first n zeros.
+
+    zeros_bessel = zeros(n, 1);
+    % Initial guess for the first zero
+    x0 = 1; 
+    for i = 1:n
+        % fzero finds the zero of the function handle near the guess x0
+        zeros_bessel(i) = fzero(@(x) besselj(order, x), x0);
+        % Update the guess for the next zero, knowing they are roughly pi apart
+        x0 = zeros_bessel(i) + pi; 
+    end
+end
+
+function results = scan_neutrals_fit(velocity_results, temperature_results, collision_profiles, ...
+    scaling_variants, scaling_reference, constants, r_fine, amps, widths, r0s, opts)
+% SCAN_NEUTRALS_FIT  Grid scan of neutral Gaussian parameters (amp × width × r0).
+%   Extended version: also scans the Gaussian peak position r0 and evaluates
+%   RMSE only on a safe radial window (r/a ∈ [0.2, 0.99]) to avoid divergences
+%   where 1/V or gradV/V produce singularities.
+%
+% USAGE:
+%   results = scan_neutrals_fit(velocity_results, temperature_results, collision_profiles, ...
+%       scaling_variants, scaling_reference, constants, r_fine, amps, widths, r0s, opts)
+%
+% REQUIRED INPUTS:
+%   velocity_results, temperature_results, collision_profiles
+%   scaling_variants  - struct containing theoretical variant vectors (fields)
+%   scaling_reference - name of theory field to compare (string) OR cell array of fields to overlay
+%   constants, r_fine  - as usual
+%   amps, widths, r0s  - vectors of amplitudes [m^-3], widths [m], peak positions [m]
+%
+% OPTIONAL 'opts' fields:
+%   opts.n0_centre    - background neutral density [m^-3] (default from constants)
+%   opts.plot_results - logical (default true)
+%   opts.verbose      - logical (default true)
+%   opts.eval_rmin_ra - minimum r/a for RMSE eval (default 0.2)
+%   opts.eval_rmax_ra - maximum r/a for RMSE eval (default 0.99)
+%
+% OUTPUT:
+%   results struct containing RMSE cube (nR0 x nW x nA), best parameters, and figures.
+
+% ----------------- Defaults & input checks -----------------
+if nargin < 11, opts = struct(); end
+if nargin < 10 || isempty(r0s)
+    r0s = constants.models.neutrals.r_max_H_alpha;
+end
+if nargin < 9 || isempty(widths), widths = linspace(0.01,0.04,10); end
+if nargin < 8 || isempty(amps), amps = linspace(5e15,3e16,12); end
+
+% options defaults
+if ~isfield(opts,'n0_centre'), opts.n0_centre = constants.models.neutrals.n_H0_centre; end
+if ~isfield(opts,'plot_results'), opts.plot_results = true; end
+if ~isfield(opts,'verbose'), opts.verbose = true; end
+if ~isfield(opts,'eval_rmin_ra'), opts.eval_rmin_ra = 0.2; end
+if ~isfield(opts,'eval_rmax_ra'), opts.eval_rmax_ra = 0.99; end
+
+% prepare sizes and preallocate RMSE cube: nR0 x nW x nA
+amps = amps(:).'; widths = widths(:); r0s = r0s(:);
+nA = numel(amps); nW = numel(widths); nR0 = numel(r0s);
+RMSE = nan(nR0, nW, nA);
+
+% choose primary theory vector
+if ischar(scaling_reference), scaling_reference = {scaling_reference}; end
+if ~isfield(scaling_variants, scaling_reference{1})
+    error('scan_neutrals_fit: scaling_variants does not contain %s', scaling_reference{1});
+end
+theory_primary = scaling_variants.(scaling_reference{1});
+theory_primary = theory_primary(:);
+
+% evaluation mask
+a = constants.machine.a;
+r_norm = r_fine ./ a;
+eval_mask = (r_norm >= opts.eval_rmin_ra) & (r_norm <= opts.eval_rmax_ra);
+eval_idx = find(eval_mask);
+if numel(eval_idx) < 5
+    error('scan_neutrals_fit: evaluation mask too small.');
+end
+
+% prepare best struct
+best.rmse = inf;
+best.amp = NaN; best.width = NaN; best.r0 = NaN;
+best.diff = []; best.nH0 = []; best.nu = [];
+
+% Main loops (preallocated RMSE prevents growing)
+for ir0 = 1:nR0
+    r0 = r0s(ir0);
+    if opts.verbose
+        fprintf('Scanning r0 %d/%d (r0=%.4f m)\n', ir0, nR0, r0);
+    end
+    for iw = 1:nW
+        w = widths(iw);
+        for ia = 1:nA
+            amp = amps(ia);
+            % construct neutral profile
+            nH0 = opts.n0_centre + amp .* exp( - (r_fine - r0).^2 ./ (2 * w.^2) );
+            % compute nu using wrapper
+            nu_struct = compute_nu_iH0_from_nH0(nH0, temperature_results, constants, r_fine);
+            coll_local = collision_profiles;
+            coll_local.nu_iH0 = nu_struct;
+            diff_local = compute_diffusivity_profile(velocity_results, coll_local, r_fine);
+            exp_vec = diff_local.profile_avg(:);
+            tvec = theory_primary(:);
+            valid_mask = eval_mask & isfinite(exp_vec) & isfinite(tvec) & (tvec >= 0);
+            if sum(valid_mask) < round(0.5 * sum(eval_mask))
+                RMSE(ir0, iw, ia) = NaN;
+                continue;
+            end
+            d = exp_vec(valid_mask) - tvec(valid_mask);
+            rmse_val = sqrt(mean(d.^2));
+            RMSE(ir0, iw, ia) = rmse_val;
+            if rmse_val < best.rmse
+                best.rmse = rmse_val;
+                best.amp = amp;
+                best.width = w;
+                best.r0 = r0;
+                best.diff = diff_local;
+                best.nH0 = nH0;
+                best.nu = nu_struct;
+            end
+        end
+    end
+end
+
+% package
+results.RMSE = RMSE;
+results.amps = amps;
+results.widths = widths;
+results.r0s = r0s;
+results.best = best;
+results.r_fine = r_fine;
+results.eval_mask = eval_mask;
+results.scaling_reference = scaling_reference;
+results.scaling_variants = scaling_variants;
+
+% plotting (kept similar to previous)
+if opts.plot_results
+    % pick best r0 plane
+    if ~isnan(best.r0)
+        [~, ir0_best] = min(abs(r0s - best.r0));
+    else
+        ir0_best = 1;
+    end
+    figure('Name','Neutral scan RMSE (best r0)','Color','w','Position',[200 200 900 500]);
+    rmse_plane = squeeze(RMSE(ir0_best,:,:));
+    imagesc(amps, widths, rmse_plane); set(gca,'YDir','normal'); colorbar;
+    xlabel('n\_H0\_amp [m^{-3}]'); ylabel('width [m]');
+    title(sprintf('RMSE vs neutral params (r0 = %.3f m)', r0s(ir0_best)));
+    hold on;
+    plot(best.amp, best.width, 'wx', 'MarkerSize', 12, 'LineWidth', 2);
+    hold off;
+
+    % overlay best fit
+    figure('Name','Best fit overlay','Color','w','Position',[220 220 900 520]);
+    r_norm = r_fine ./ a;
+    plot(r_norm, best.diff.profile_avg, 'k-', 'LineWidth', 2, 'DisplayName', '\chi_{eff} (best fit, exp)');
+    hold on;
+    if isfield(best.diff,'ci_lower') && isfield(best.diff,'ci_upper')
+        fill([r_norm; flipud(r_norm)], [best.diff.ci_lower; flipud(best.diff.ci_upper)], [0.85 0.85 0.85], 'FaceAlpha', 0.25, 'EdgeColor','none');
+    end
+    plot(r_norm, scaling_variants.(scaling_reference{1})(:), 'b--', 'LineWidth', 1.6, 'DisplayName', scaling_reference{1});
+    legend('Location','northwest');
+    xlabel('r/a'); ylabel('\chi [m^2/s]');
+    title('Best fit experimental vs theoretical');
+    hold off;
+end
+end
+
+
