@@ -124,19 +124,3 @@ function [derived_profiles] = compute_derived_profiles(exp_data, ...
 
     fprintf('Derived profiles calculated successfully.\n\n');
 end
-
-function mustContainFields(s, fields)
-    % Custom validation function to ensure a struct contains required fields
-    if ~isstruct(s)
-        eid = 'Validation:notStruct';
-        msg = 'Input must be a struct.';
-        throwAsCaller(MException(eid, msg));
-    end
-    for i = 1:numel(fields)
-        if ~isfield(s, fields{i})
-            eid = 'Validation:missingField';
-            msg = sprintf('Input struct is missing required field: ''%s''', fields{i});
-            throwAsCaller(MException(eid, msg));
-        end
-    end
-end
