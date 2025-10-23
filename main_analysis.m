@@ -193,7 +193,8 @@ fprintf('\n>>> All calculation stages executed (or loaded) successfully.\n\n');
 % =========================================================================
 % PLOTTING SECTION
 % =========================================================================
-if any(struct2array(plot_flags))
+plot_flags_as_cell = struct2cell(plot_flags);   % Step 1: Store into a variable
+if any([plot_flags_as_cell{:}])                 % Step 2: Using the variable
     fprintf('--- Generating selected plots ---\n');
     try
         if plot_flags.justification_and_fits
