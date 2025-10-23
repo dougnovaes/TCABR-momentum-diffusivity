@@ -22,8 +22,7 @@ function [theoretical_models] = compute_theoretical_models(temperature_results, 
     B_pol       = magnetic_field.poloidal;
     e_charge    = constants.physics.e_charge;
     epsilon     = constants.machine.epsilon_aspect_ratio;
-    % **CORRECTION**: Use the specific Solomon-consistent collisionality
-    nu_star_e   = derived_profiles.collisionality.nu_star_e_solomon;
+    nu_star_e   = derived_profiles.collisionality.nu_star_e;
     R_over_Ln   = derived_profiles.gradients.R_over_Ln;
 
     % --- 2. Helander Model for Toroidal Velocity ---
