@@ -1,6 +1,4 @@
 % =========================================================================
-% main_analysis.m
-% =========================================================================
 % TCABR MOMENTUM TRANSPORT ANALYSIS (MODULAR & CACHE-ENABLED)
 % =========================================================================
 % PURPOSE:
@@ -15,25 +13,34 @@
 %
 % LAYOUT:
 %   Root/
-%     ├── src/         # Core computational routines (physics & analysis)
-%     ├── utils/       # Utility functions and wrappers
-%     ├── plotting/    # Publication-quality visualisation scripts
-%     ├── studies/     # High-level parameter scans or specialised analyses
-%     └── results/     # Per-stage .mat results and plots
+%     ├── main_analysis.m    # This script
+%     ├── data/              # Input data files (e.g., .txt)
+%     ├── src/               # Core computational routines (physics & analysis)
+%     ├── utils/             # Utility functions and wrappers
+%     ├── plotting/          # Publication-quality visualisation scripts
+%     ├── studies/           # High-level parameter scans or specialised analyses
+%     └── results/           # Per-stage .mat results and generated plots
 %
 % REQUIREMENTS:
 %   MATLAB R2025b or newer
+%   - Curve Fitting Toolbox
+%   - Parallel Computing Toolbox
+%   - Statistics and Machine Learning Toolbox
 % =========================================================================
 
 clc; clear; close all;
 fprintf('>>> Initiating TCABR modular momentum analysis pipeline...\n\n');
 
 % -------------------------------------------------------------------------
-% PATH SETUP
+% PATH SETUP (Robust)
 % -------------------------------------------------------------------------
-addpath('src', 'plotting', 'utils');
+[base_dir, ~, ~] = fileparts(mfilename('fullpath'));
+addpath(fullfile(base_dir, 'src'), ...
+        fullfile(base_dir, 'plotting'), ...
+        fullfile(base_dir, 'utils'), ...
+        fullfile(base_dir, 'studies'));
 
-results_dir = 'results';
+results_dir = fullfile(base_dir, 'results');
 if ~exist(results_dir, 'dir'), mkdir(results_dir); end
 plots_dir = fullfile(results_dir, 'plots');
 if ~exist(plots_dir, 'dir'), mkdir(plots_dir); end
@@ -41,30 +48,32 @@ if ~exist(plots_dir, 'dir'), mkdir(plots_dir); end
 % -------------------------------------------------------------------------
 % CONTROL PANEL
 % -------------------------------------------------------------------------
-t = true; f = false;  % convenience flags
+% Set flags to 'true' to force re-computation or generate plots.
+% Set to 'false' to load from cache or skip plotting.
 
 run_flags = struct( ...
-    'setup_and_data',        f, ...
-    'profile_analyses',      f, ...
-    'physics_profiles',      f, ...
-    'theoretical_models',    f, ...
-    'neutral_and_collision', f, ...
-    'diffusivity_thesis',    f, ...
-    'diffusivity_scaling',   f ...
+    'setup_and_data',        false, ... % Stage 1
+    'profile_analyses',      false, ... % Stage 2
+    'physics_profiles',      false, ... % Stage 3
+    'theoretical_models',    false, ... % Stage 4
+    'neutral_and_collision', false, ... % Stage 5
+    'diffusivity_thesis',    false, ... % Stage 6
+    'diffusivity_scaling',   false, ... % Stage 7a
+    'build_variants',        false  ... % Stage 7b (New)
 );
 
 plot_flags = struct( ...
-    'justification_and_fits',   t, ...
-    'thesis_method_results',    f, ...
-    'supporting_profiles',      f, ...
-    'final_comparison',         f ...
+    'justification_and_fits',  true, ...
+    'thesis_method_results',   true, ...
+    'supporting_profiles',     true, ...
+    'final_comparison',        true  ... % Will use the new variants
 );
 
 study_flags = struct( ...
-    'neutral_scan', f ... % activate studies/scan_neutrals_fit
+    'neutral_scan', false ... % Activates studies/run_scan_neutrals_fit
 );
 
-stop_on_error = true;  % if true, halts execution upon any unhandled error
+stop_on_error = true; % if true, halts execution upon any unhandled error
 
 fprintf('>>> Control panel configured.\n\n');
 
@@ -152,17 +161,31 @@ catch ME
     handle_stage_error(ME, 6, stop_on_error);
 end
 
-%% -------------------- STAGE 7: DIFFUSIVITY (SCALING LAWS) ---------------
+%% -------------------- STAGE 7A: DIFFUSIVITY (SCALING LAWS - BASE) --------
 % Outputs: scaling_law_results
 try
     scaling_law_results = load_or_compute( ...
-        fullfile(results_dir, 'stage7_diffusivity_scaling.mat'), ...
+        fullfile(results_dir, 'stage7a_diffusivity_scaling_base.mat'), ...
         run_flags.diffusivity_scaling, ...
-        @() stage7_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine), ...
+        @() stage7a_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine), ...
         {'scaling_law_results'});
-    fprintf('[✓] Stage 7 completed: effective diffusivity (scaling laws).\n');
+    fprintf('[✓] Stage 7a completed: effective diffusivity (base scaling laws).\n');
 catch ME
     handle_stage_error(ME, 7, stop_on_error);
+end
+
+%% -------------------- STAGE 7B: BUILD THEORETICAL VARIANTS ---------------
+% Outputs: theoretical_variants
+try
+    theoretical_variants = load_or_compute( ...
+        fullfile(results_dir, 'stage7b_theoretical_variants.mat'), ...
+        run_flags.build_variants, ...
+        @() build_theoretical_variants(velocity_results, ... % Chamada corrigida
+                                       derived_profiles, constants, r_fine), ...
+        {'theoretical_variants'});
+    fprintf('[✓] Stage 7b completed: theoretical chi_eff variants built.\n');
+catch ME
+    handle_stage_error(ME, 7.5, stop_on_error);
 end
 
 fprintf('\n>>> All calculation stages executed (or loaded) successfully.\n\n');
@@ -170,79 +193,58 @@ fprintf('\n>>> All calculation stages executed (or loaded) successfully.\n\n');
 % =========================================================================
 % PLOTTING SECTION
 % =========================================================================
-fprintf('--- Generating selected plots ---\n');
-
-try
-    if plot_flags.justification_and_fits
-        plot_justification_and_fits(constants, exp_data, velocity_results, ...
-            temperature_results, theoretical_models, r_fine);
-    end
-
-    if plot_flags.thesis_method_results
-        plot_thesis_method_results(constants, neutral_profile, collision_profiles, ...
-            effective_diffusivity_thesis, r_fine);
-    end
-
-    if plot_flags.supporting_profiles
-        plot_supporting_profiles(constants, derived_profiles, r_fine);
-    end
-
-    if plot_flags.final_comparison
-        % Compute or load chi_eff variants for theoretical comparison
-        if ~exist('variants','var') || isempty(variants)
-            variants = compute_chi_eff_variants(scaling_law_results, ...
-                velocity_results, derived_profiles, constants, r_fine);
+if any(struct2array(plot_flags))
+    fprintf('--- Generating selected plots ---\n');
+    try
+        if plot_flags.justification_and_fits
+            plot_stage1_justification_and_fits(constants, exp_data, velocity_results, ...
+                temperature_results, theoretical_models, r_fine, plots_dir);
         end
-        plot_final_comparison(effective_diffusivity_thesis, variants, ...
-            scaling_law_results, constants);
+
+        if plot_flags.thesis_method_results
+            plot_stage2_thesis_method(constants, neutral_profile, collision_profiles, ...
+                effective_diffusivity_thesis, r_fine, plots_dir);
+        end
+
+        if plot_flags.supporting_profiles
+            plot_stage3_supporting_profiles(constants, derived_profiles, r_fine, plots_dir);
+        end
+
+        if plot_flags.final_comparison
+            % This new plot function uses the detailed variants
+            plot_final_comparison_variants(effective_diffusivity_thesis, theoretical_variants, ...
+                constants, plots_dir);
+        end
+        fprintf('--- Plotting complete. Figures saved to %s ---\n', plots_dir);
+    catch ME
+        warning(ME.identifier,'Plotting phase failed: %s', ME.message);
+        fprintf(2, 'Error occurred in file %s at line %d.\n', ME.stack(1).file, ME.stack(1).line);
     end
-catch ME
-    warning(ME.identifier,'Plotting phase failed: %s', ME.message);
 end
 
 % =========================================================================
 % STUDY SECTION (optional)
 % =========================================================================
-if study_flags.neutral_scan
-    try
-        fprintf('--- Running neutral density parameter scan ---\n');
-        addpath('studies');
-        run('studies/run_scan_neutrals_fit.m');
-    catch ME
-        warning(ME.identifier,'Neutral scan study failed: %s', ME.message);
+if any(struct2array(study_flags))
+    fprintf('\n--- Running selected studies ---\n');
+    if study_flags.neutral_scan
+        try
+            run_scan_neutrals_fit(velocity_results, temperature_results, collision_profiles, ...
+                theoretical_variants, constants, r_fine, results_dir);
+        catch ME
+            warning(ME.identifier,'Neutral scan study failed: %s', ME.message);
+            fprintf(2, 'Error occurred in file %s at line %d.\n', ME.stack(1).file, ME.stack(1).line);
+        end
     end
 end
 
 fprintf('\n>>> TCABR modular momentum analysis completed successfully.\n');
 
-% =========================================================================
-% LOCAL UTILITY FUNCTIONS
-% =========================================================================
-function handle_stage_error(ME, stage_num, stop_on_error)
-    fprintf(2, '[X] Stage %d failed: %s\n', stage_num, ME.message);
-    if stop_on_error, rethrow(ME); end
-end
 
-function varargout = load_or_compute(filepath, force_recalc, compute_func, out_names)
-    if exist(filepath, 'file') && ~force_recalc
-        fprintf('Loading cached results from: %s\n', filepath);
-        S = load(filepath);
-        varargout = cell(1, nargout);
-        for k = 1:nargout
-            varargout{k} = S.(out_names{k});
-        end
-        return;
-    end
-    fprintf('Computing and saving results to: %s\n', filepath);
-    [varargout{1:nargout}] = compute_func();
-    S = struct();
-    for k = 1:nargout
-        S.(out_names{k}) = varargout{k};
-    end
-    save(filepath, '-struct', 'S');
-end
-
-% --- Stage wrappers (simple delegation to /src functions) ----------------
+% =========================================================================
+% LOCAL STAGE WRAPPERS
+% These are thin wrappers that delegate the actual work to functions in /src
+% =========================================================================
 function [constants, exp_data, r_fine] = stage1_setup_and_data()
     constants = setup_constants();
     exp_data = load_experimental_data(constants);
@@ -272,10 +274,12 @@ function effective_diffusivity_thesis = stage6_diffusivity_thesis(velocity_resul
     effective_diffusivity_thesis = compute_diffusivity_profile(velocity_results, collision_profiles, r_fine);
 end
 
-function scaling_law_results = stage7_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine)
+function scaling_law_results = stage7a_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine)
+    % Note: Renamed to clarify this is the 'base' calculation
     scaling_law_results = compute_chi_eff_from_scalings(velocity_results, derived_profiles, constants, r_fine);
 end
 
-% =========================================================================
-% End of main_analysis.m
-% =========================================================================
+function theoretical_variants = stage7b_build_theoretical_variants(scaling_law_results, velocity_results, derived_profiles, constants, r_fine)
+    % This will be the new, powerful function for variant generation
+    theoretical_variants = build_theoretical_variants(scaling_law_results, velocity_results, derived_profiles, constants, r_fine);
+end
