@@ -11,20 +11,29 @@ function [diffusivity_results] = compute_diffusivity_profile(velocity_results, c
 %   Syntax:
 %       diffusivity_results = compute_diffusivity_profile(velocity_results, collision_profiles, r_fine)
 
-    arguments
-        velocity_results (1,1) struct {mustContainFields(velocity_results, 'chi_phi_coeff')}
-        collision_profiles (1,1) struct {mustContainFields(collision_profiles, 'nu_iH0')}
+arguments
+        velocity_results (1,1) struct
+        collision_profiles (1,1) struct
         r_fine (:,1) {mustBeNumeric, mustBeReal, mustBeFinite}
     end
 
     fprintf('Calculating effective momentum diffusivity profile (Thesis Method)...\n');
 
-    % --- 1. Extract Necessary Data ---
+    % --- 1. Input Validation and Data Extraction ---
+    if ~isfield(velocity_results, 'chi_phi_coeff')
+        error('Input struct ''velocity_results'' is missing required field: ''chi_phi_coeff''');
+    end
+    if ~isfield(collision_profiles, 'nu_iH0')
+        error('Input struct ''collision_profiles'' is missing required field: ''nu_iH0''');
+    end
+
     chi_phi_coeff = velocity_results.chi_phi_coeff;
     nu_iH0 = collision_profiles.nu_iH0;
     
     validateattributes(chi_phi_coeff, {'numeric'}, {'scalar', 'real', 'finite'}, mfilename, 'chi_phi_coeff');
-    mustContainFields(nu_iH0, {'avg', 'ci_lower', 'ci_upper'});
+    if ~isfield(nu_iH0, 'avg') || ~isfield(nu_iH0, 'ci_lower') || ~isfield(nu_iH0, 'ci_upper')
+         error('Input struct ''collision_profiles.nu_iH0'' is missing required fields.');
+    end
 
     % --- 2. Calculate Diffusivity Profile and Propagate Uncertainty ---
     chi_eff_avg      = chi_phi_coeff * nu_iH0.avg;

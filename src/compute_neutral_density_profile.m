@@ -9,16 +9,25 @@ function [neutral_profile] = compute_neutral_density_profile(r_fine, constants)
 %   Syntax:
 %       neutral_profile = compute_neutral_density_profile(r_fine, constants)
 
-    arguments
+arguments
         r_fine (:,1) {mustBeNumeric, mustBeReal, mustBeFinite}
-        constants (1,1) struct {mustContainFields(constants, {'models'})}
+        constants (1,1) struct
     end
 
     fprintf('Calculating neutral particle density profile...\n');
 
-    % --- 1. Extract Model Parameters ---
+    % --- 1. Input Validation and Parameter Extraction ---
+    if ~isfield(constants, 'models') || ~isfield(constants.models, 'neutrals')
+        error('Input struct ''constants'' is missing required field path: ''models.neutrals''');
+    end
     params = constants.models.neutrals;
-    mustContainFields(params, {'n_H0_centre', 'n_H0_max_amp', 'r_max_H_alpha', 'width'});
+    
+    required_fields = {'n_H0_centre', 'n_H0_max_amp', 'r_max_H_alpha', 'width'};
+    for i = 1:numel(required_fields)
+        if ~isfield(params, required_fields{i})
+            error('constants.models.neutrals is missing required field: %s', required_fields{i});
+        end
+    end
     
     n_H0_c = params.n_H0_centre;
     n_H0_max = params.n_H0_max_amp;
