@@ -32,8 +32,9 @@ function [variants] = build_theoretical_variants(velocity_results, derived_profi
     safe_mask = (r_norm >= 0.2) & (r_norm <= 0.9);
 
     % Robustly calculate the R/L_Vphi profile
-    % Use a smoothed velocity profile to get a stable gradient
-    v_phi_smooth = sgolayfilt(velocity_results.poly_fit_avg, 3, 15);
+    % --- CORRECTION: Replaced sgolayfilt with smoothdata to remove toolbox dependency ---
+    % OLD: v_phi_smooth = sgolayfilt(velocity_results.poly_fit_avg, 3, 15);
+    v_phi_smooth = smoothdata(velocity_results.poly_fit_avg, 'movmean', 15);
     grad_Vphi = gradient(v_phi_smooth, r_fine);
     
     % Regularize to avoid division by zero
