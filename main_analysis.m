@@ -276,5 +276,5 @@ end
 
 function scaling_law_results = stage7a_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine)
     % Note: Renamed to clarify this is the 'base' calculation
-    scaling_law_results = compute_chi_eff_from_scalings(velocity_results, derived_profiles, constants, r_fine);
+    scaling_law_results = compute_chi_eff_from_scalings_base(velocity_results, derived_profiles, constants, r_fine);
 end
