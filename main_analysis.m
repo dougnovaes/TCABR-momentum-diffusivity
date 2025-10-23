@@ -234,7 +234,7 @@ if any([study_flags_as_cell{:}])
             run_scan_neutrals_fit(velocity_results, temperature_results, theoretical_variants, ...
                 constants, r_fine, results_dir);
         catch ME
-            warning(ME.identifier,'Neutral scan study failed: %s', ME.message);
+            warning(ME.identifier, 'Neutral scan study failed: %s', ME.message);
             fprintf(2, 'Error occurred in file %s at line %d.\n', ME.stack(1).file, ME.stack(1).line);
         end
     end
