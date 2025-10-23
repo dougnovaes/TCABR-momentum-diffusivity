@@ -108,6 +108,20 @@ function [derived_profiles] = compute_derived_profiles(exp_data, ...
     collisionality.nu_star_i = collisions.nu_i_15 ./ (epsilon .* omega_bounce_i);
     collisionality.nu_star_e = collisions.nu_ei_15 ./ (epsilon .* omega_bounce_e);
     
+    % --- 5b. Solomon/Maslov Collisionality ---
+    % This definition is required for a consistent comparison with the Solomon et al. (2010)
+    % scaling laws, which are based on the effective collisionality defined in Maslov et al. (2009).
+    % It is defined as the ratio of the electron-ion collision frequency
+    % to the curvature drift frequency.
+    % Formula: v_eff = 10e-14 * Z_eff * R * n_e / T_e^2  (with T_e in eV).
+    % The equivalent definition is v_ei / w_De, where w_De ~ T_e / (R * B).
+    % This implementation uses local profile values for R, n_e, and T_e.
+    % NOTE: Solomon uses Te in keV, and Maslov's formula uses <Te> in eV.
+    % Maslov's formula v_eff = 10^-14 * Z_eff * R * n_e / T_e^2 (with Te in eV)
+    % is the one we will implement for the radial profiles.
+    fprintf('... calculating Solomon/Maslov collisionality\n');
+    collisionality.nu_star_e_solomon = 1e-14 * constants.plasma.Zeff .* R_coord .* ne_fine ./ (Te_mean.^2);
+
     % --- 6. Normalised Density Gradient (R/Ln) ---
     gradients = struct();
     L_ne_inv = -gradient(log(ne_fine), r_fine); % 1/L_n [m^-1]
