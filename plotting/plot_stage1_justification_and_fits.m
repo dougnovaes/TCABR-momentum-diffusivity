@@ -1,20 +1,26 @@
 function plot_stage1_justification_and_fits(constants, exp_data, velocity_results, temperature_results, theoretical_models, r_fine, save_dir)
 %PLOT_STAGE1_JUSTIFICATION_AND_FITS Generates plots for the primary fits and theoretical justification.
 %   This function creates three key figures that replicate the narrative of the thesis:
-%   1. The canonical fit of the ion temperature profile.
+%   1. The canonical fit of the ion temperature profile (Matches Thesis Fig. 3.6).
 %   2. The comparison of the Helander model against experimental velocity data, which
-%      justifies the theoretical approach of the thesis.
-%   3. The full analysis of the velocity profile, including the Fourier-Bessel fit.
+%      justifies the theoretical approach of the thesis (Matches Thesis Fig. 3.4).
+%   3. The full analysis of the velocity profile, including the Fourier-Bessel fit
+%      (Matches Thesis Fig. 3.5).
+
     arguments
-        constants (1,1) struct, exp_data (1,1) struct, velocity_results (1,1) struct
-        temperature_results (1,1) struct, theoretical_models (1,1) struct
-        r_fine (:,1) double, save_dir (1,1) string
+        constants (1,1) struct
+        exp_data (1,1) struct
+        velocity_results (1,1) struct
+        temperature_results (1,1) struct
+        theoretical_models (1,1) struct
+        r_fine (:,1) double
+        save_dir (1,1) string
     end
 
     fprintf('Plotting Stage 1: Justification and Primary Fits...\n');
     r_norm = r_fine / constants.machine.a;
 
-    % --- Figure 1: Ion Temperature Profile Analysis ---
+    % --- Figure 1: Ion Temperature Profile Analysis (Thesis Fig. 3.6) ---
     fig1 = figure('Name', 'Ion Temperature Profile Analysis');
     ax1 = gca; hold(ax1, 'on');
     errorbar(ax1, exp_data.r_Ti_exp / constants.machine.a, exp_data.Ti_reconstructed_exp, ...
@@ -30,7 +36,7 @@ function plot_stage1_justification_and_fits(constants, exp_data, velocity_result
     set_publication_style(ax1); hold(ax1, 'off');
     saveas(fig1, fullfile(save_dir, 'stage1_temp_fit.png')); savefig(fig1, fullfile(save_dir, 'stage1_temp_fit.fig'));
 
-    % --- Figure 2: Helander Model Justification ---
+    % --- Figure 2: Helander Model Justification (Thesis Fig. 3.4) ---
     fig2 = figure('Name', 'Helander Model Justification');
     ax2 = gca; hold(ax2, 'on');
     h1 = errorbar(ax2, exp_data.r_Vphi_exp / constants.machine.a, -exp_data.Vphi_exp, ...
@@ -48,7 +54,7 @@ function plot_stage1_justification_and_fits(constants, exp_data, velocity_result
     set_publication_style(ax2); hold(ax2, 'off');
     saveas(fig2, fullfile(save_dir, 'stage1_helander_justification.png')); savefig(fig2, fullfile(save_dir, 'stage1_helander_justification.fig'));
 
-    % --- Figure 3: Velocity Profile Fourier-Bessel Analysis ---
+    % --- Figure 3: Velocity Profile Fourier-Bessel Analysis (Thesis Fig. 3.5) ---
     fig3 = figure('Name', 'Velocity Profile Analysis');
     ax3 = gca; hold(ax3, 'on');
     errorbar(ax3, exp_data.r_Vphi_exp / constants.machine.a, -exp_data.Vphi_exp, ...
