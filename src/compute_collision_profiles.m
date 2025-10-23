@@ -20,6 +20,9 @@ function [collision_profiles] = compute_collision_profiles(temperature_results, 
     mustContainFields(temperature_results.bootstrap, {'all_fitted_profiles'});
     all_ti_profiles = temperature_results.bootstrap.all_fitted_profiles;
 
+    % **CORRECTION**: Sanitize data by clamping unphysical negative temperatures to zero.
+    all_ti_profiles(all_ti_profiles < 0) = 0;
+
     validateattributes(all_ti_profiles, {'numeric'}, {'2d', 'real', 'finite', 'nonnegative'}, mfilename, 'all_fitted_profiles');
     if size(all_ti_profiles, 2) ~= numel(r_fine)
         error('Dimension mismatch: The number of points in temperature profiles (%d) does not match the radial grid (%d).', ...
