@@ -32,7 +32,7 @@ function plot_stage2_thesis_method(constants, neutral_profile, collision_profile
     ax1_right = subplot(1, 2, 2); hold(ax1_right, 'on');
     cx_rate = collision_profiles.cx_rate;
     fill(ax1_right, [r_norm; flipud(r_norm)], [cx_rate.ci_lower; flipud(cx_rate.ci_upper)] * 1e8, ...
-        orange_color, 'FaceAlpha', 0.3, 'EdgeColor', 'none', 'DisplayName', '95% CI');
+        orange_color, 'FaceAlpha', 0.3, 'EdgeColor', 'none', 'DisplayName', '95\% CI');
     plot(ax1_right, r_norm, cx_rate.avg * 1e8, 'LineWidth', 3.5, 'Color', orange_color, 'DisplayName', 'Mean');
     grid(ax1_right, 'on'); xlabel(ax1_right, 'Normalised Radius ($r/a$)');
     ylabel(ax1_right, '$\langle \sigma v \rangle_{cx}$ ($\times10^{-8}$ cm$^3$/s)');
@@ -45,7 +45,7 @@ function plot_stage2_thesis_method(constants, neutral_profile, collision_profile
     ax2_left = subplot(1, 2, 1); hold(ax2_left, 'on');
     nu_iH0 = collision_profiles.nu_iH0;
     fill(ax2_left, [r_norm; flipud(r_norm)], [nu_iH0.ci_lower / 1e3; flipud(nu_iH0.ci_upper / 1e3)], ...
-        orange_color, 'FaceAlpha', 0.3, 'EdgeColor', 'none', 'DisplayName', '95% CI');
+        orange_color, 'FaceAlpha', 0.3, 'EdgeColor', 'none', 'DisplayName', '95\% CI');
     plot(ax2_left, r_norm, nu_iH0.avg / 1e3, 'LineWidth', 3.5, 'Color', orange_color, 'DisplayName', 'Mean');
     grid(ax2_left, 'on'); xlabel(ax2_left, 'Normalised Radius ($r/a$)');
     ylabel(ax2_left, 'Collision Frequency, $\nu_{iH0}$ ($\times10^3$ s$^{-1}$)');
@@ -54,7 +54,7 @@ function plot_stage2_thesis_method(constants, neutral_profile, collision_profile
 
     ax2_right = subplot(1, 2, 2); hold(ax2_right, 'on');
     fill(ax2_right, [r_norm; flipud(r_norm)], [effective_diffusivity_thesis.ci_lower; flipud(effective_diffusivity_thesis.ci_upper)], ...
-        [0, 0.4, 0.7], 'FaceAlpha', 0.3, 'EdgeColor', 'none', 'DisplayName', '95% CI');
+        [0, 0.4, 0.7], 'FaceAlpha', 0.3, 'EdgeColor', 'none', 'DisplayName', '95\% CI');
     plot(ax2_right, r_norm, effective_diffusivity_thesis.profile_avg, 'LineWidth', 4, 'Color', [0, 0.2, 0.5], 'DisplayName', 'Mean');
     yline(ax2_right, 0, '--'); grid(ax2_right, 'on');
     xlabel(ax2_right, 'Normalised Radius ($r/a$)');
