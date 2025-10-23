@@ -1,169 +1,141 @@
 function [temp_results] = analyze_temperature_profile(exp_data, constants, r_fine)
 %ANALYZE_TEMPERATURE_PROFILE Performs a detailed statistical analysis of the ion temperature profile.
-%   This function fits a canonical profile model to the experimental ion
-%   temperature data. It incorporates robust error handling, diagnostic
-%   tracking, and a Monte Carlo bootstrap method for uncertainty quantification.
+%   This function fits a canonical profile model of the form:
+%       T_i(r) = (T0 - Ta) * (1 - (r/a)^2)^sigma + Ta
+%   to the experimental ion temperature data. It uses a robust Monte Carlo
+%   bootstrap method for rigorous uncertainty quantification.
 %
 %   Key tasks:
-%   1.  Performs a primary weighted non-linear least-squares fit to the 
-%       reconstructed experimental data to find the optimal parameters (T0, Ta, sigma).
-%   2.  Executes a Monte Carlo bootstrap analysis by repeatedly fitting the model
-%       to data points perturbed within their error bars to determine uncertainties.
-%   3.  Calculates the mean fitted profile, R-squared value, and the 95% 
-%       confidence band.
+%   1.  Performs a primary weighted non-linear least-squares fit to find the
+%       optimal parameters (T0, Ta, sigma).
+%   2.  Executes a bootstrap analysis by repeatedly fitting the model to data
+%       perturbed within their error bars.
+%   3.  Calculates the mean fitted profile, R-squared value, and the 95%
+%       confidence band from the distribution of bootstrap fits.
 %
 %   Syntax:
 %       temp_results = analyze_temperature_profile(exp_data, constants, r_fine)
 %
 %   Inputs:
 %       exp_data  - Structure with experimental Ti data points.
-%       constants - Structure with machine parameters and analysis settings.
+%       constants - Structure with machine and analysis settings.
 %       r_fine    - The high-resolution radial grid for profile evaluation [m].
 %
 %   Output:
-%       temp_results - A structure containing all analysis results for the ion temperature.
+%       temp_results - A structure containing all analysis results for Ti.
 
-fprintf('Starting ion temperature profile analysis...\n');
-t_start = tic;
-
-% --- 1. Input Validation and Preparation ---
-% Ensure all input vectors are columns for consistency.
-r_exp        = exp_data.r_Ti_exp(:);
-ti_recon_exp = exp_data.Ti_reconstructed_exp(:);
-ti_recon_err = exp_data.Ti_reconstructed_err_exp(:);
-r_fine       = r_fine(:); % Ensure r_fine is a column vector
-
-a            = constants.machine.a;
-n_iter       = constants.analysis.num_iterations;
-n_data       = numel(r_exp);
-n_r          = numel(r_fine);
-
-% --- 2. Define Fit Model, Guesses, and Solver Options ---
-% The canonical profile is wrapped in a helper function 'real_profile' (see end of file)
-% to prevent numerical issues (e.g., complex numbers from negative bases).
-Ti_function = @(params, r_val) real_profile(params, r_val, a);
-
-% Initial guess for parameters [T0; Ta; sigma] and bounds (sigma must be non-negative)
-initial_guess = [270; 30; 3.44]; % As column
-lower_bounds = [-Inf; -Inf; 0];
-upper_bounds = [Inf;  Inf;  Inf];
-
-% Weighted residual (lsqnonlin uses the square root of the weights)
-weights_sqrt = 1 ./ ti_recon_err;
-weighted_residual = @(params) (Ti_function(params, r_exp) - ti_recon_exp) .* weights_sqrt;
-
-options = optimset('Display', 'off', 'TolFun', 1e-6, 'TolX', 1e-6);
-
-% --- 3. Perform Primary Fit on Unperturbed Data ---
-fprintf('Performing primary fit for optimal parameters...\n');
-try
-    params_optimized = lsqnonlin(weighted_residual, initial_guess, lower_bounds, upper_bounds, options);
-catch ME
-    warning(ME.identifier, 'Primary fit failed: %s. Using initial guess as optimised parameters.', ME.message);
-    params_optimized = initial_guess;
-end
-ti_fit_primary = Ti_function(params_optimized, r_fine);
-
-% Calculate R-squared for the primary fit
-ti_fit_at_data_points = Ti_function(params_optimized, r_exp);
-ss_res = sum((ti_recon_exp - ti_fit_at_data_points).^2);
-ss_tot = sum((ti_recon_exp - mean(ti_recon_exp)).^2);
-r_squared = 1 - ss_res / (ss_tot + eps); % Add eps to prevent division by zero
-fprintf('Primary fit complete. R-squared: %.4f\n', r_squared);
-
-% --- 4. Monte Carlo Bootstrap for Uncertainty Analysis ---
-% Pre-generate all perturbed datasets for efficiency
-ti_perturbed_sets = ti_recon_exp + ti_recon_err .* randn(n_data, n_iter);
-
-% Pre-allocate with NaN for easy identification of failed fits
-all_fitted_params   = nan(n_iter, numel(initial_guess));
-all_fitted_profiles = nan(n_iter, n_r); % Use (iterations x points) for parfor stability
-convergence_flags   = false(n_iter, 1);
-
-if isempty(gcp('nocreate'))
-    parpool;
-end
-
-fprintf('Running %d bootstrap iterations for uncertainty analysis...\n', n_iter);
-parfor i = 1:n_iter
-    % Define residual function for the current perturbed data set
-    current_residual_func = @(params) ...
-        (Ti_function(params, r_exp) - ti_perturbed_sets(:, i)) .* weights_sqrt;
-    
-    try
-        % Attempt to fit the perturbed data
-        params_perturbed = lsqnonlin(current_residual_func, initial_guess, lower_bounds, upper_bounds, options);
-        
-        % Check for a valid fit before storing
-        if all(isfinite(params_perturbed))
-            all_fitted_params(i, :) = params_perturbed;
-            all_fitted_profiles(i, :) = Ti_function(params_perturbed, r_fine)'; % Store as a row
-            convergence_flags(i) = true;
-        end
-    catch
-        % If lsqnonlin fails, the pre-allocated NaN values are kept.
+    arguments
+        exp_data (1,1) struct
+        constants (1,1) struct
+        r_fine (:,1) {mustBeNumeric, mustBeReal, mustBeFinite}
     end
+
+    fprintf('Starting ion temperature profile analysis...\n');
+    t_start = tic;
+
+    % --- 1. Input Validation and Preparation ---
+    r_exp        = exp_data.r_Ti_exp(:);
+    ti_recon_exp = exp_data.Ti_reconstructed_exp(:);
+    ti_recon_err = exp_data.Ti_reconstructed_err_exp(:);
+    
+    validateattributes(r_exp, {'numeric'}, {'vector', 'real', 'finite', 'nonnegative'}, mfilename, 'exp_data.r_Ti_exp');
+    validateattributes(ti_recon_exp, {'numeric'}, {'vector', 'real', 'finite', 'size', size(r_exp)}, mfilename, 'exp_data.Ti_reconstructed_exp');
+    validateattributes(ti_recon_err, {'numeric'}, {'vector', 'real', 'finite', 'nonnegative', 'size', size(r_exp)}, mfilename, 'exp_data.Ti_reconstructed_err_exp');
+
+    a            = constants.machine.a;
+    n_iter       = constants.analysis.num_iterations;
+    n_data       = numel(r_exp);
+
+    % --- 2. Define Fit Model, Guesses, and Solver Options ---
+    Ti_function = @(params, r_val) real_profile(params, r_val, a);
+
+    initial_guess = [270; 30; 3.44]; % [T0; Ta; sigma]
+    lower_bounds  = [-Inf; -Inf; 0]; % sigma must be non-negative
+    upper_bounds  = [Inf;  Inf;  Inf];
+
+    weights_sqrt = 1 ./ ti_recon_err;
+    weighted_residual = @(params) (Ti_function(params, r_exp) - ti_recon_exp) .* weights_sqrt;
+
+    options = optimset('Display', 'off', 'TolFun', 1e-6, 'TolX', 1e-6);
+
+    % --- 3. Perform Primary Fit on Unperturbed Data ---
+    fprintf('Performing primary fit for optimal parameters...\n');
+    try
+        params_optimized = lsqnonlin(weighted_residual, initial_guess, lower_bounds, upper_bounds, options);
+    catch ME
+        warning('Primary fit failed: %s. Using initial guess as optimised parameters.', ME.message);
+        params_optimized = initial_guess;
+    end
+    ti_fit_primary = Ti_function(params_optimized, r_fine);
+
+    % Calculate R-squared for the primary fit
+    ti_fit_at_data_points = Ti_function(params_optimized, r_exp);
+    ss_res = sum(weights_sqrt.^2 .* (ti_recon_exp - ti_fit_at_data_points).^2);
+    ss_tot = sum(weights_sqrt.^2 .* (ti_recon_exp - mean(ti_recon_exp)).^2);
+    r_squared = 1 - ss_res / (ss_tot + eps); % Add eps for stability
+    fprintf('Primary fit complete. R-squared: %.4f\n', r_squared);
+
+    % --- 4. Monte Carlo Bootstrap for Uncertainty Analysis ---
+    fprintf('Running %d bootstrap iterations for uncertainty analysis...\n');
+    ti_perturbed_sets = ti_recon_exp + ti_recon_err .* randn(n_data, n_iter);
+
+    all_fitted_params   = nan(n_iter, numel(initial_guess));
+    all_fitted_profiles = nan(n_iter, numel(r_fine));
+    convergence_flags   = false(n_iter, 1);
+
+    parfor i = 1:n_iter
+        current_residual_func = @(params) ...
+            (Ti_function(params, r_exp) - ti_perturbed_sets(:, i)) .* weights_sqrt;
+        
+        try
+            params_perturbed = lsqnonlin(current_residual_func, initial_guess, lower_bounds, upper_bounds, options);
+            if all(isfinite(params_perturbed))
+                all_fitted_params(i, :) = params_perturbed;
+                all_fitted_profiles(i, :) = Ti_function(params_perturbed, r_fine)'; % Store as a row
+                convergence_flags(i) = true;
+            end
+        catch
+            % If lsqnonlin fails, pre-allocated NaNs are kept.
+        end
+    end
+
+    % --- 5. Post-Process Bootstrap Results ---
+    n_converged = sum(convergence_flags);
+    fprintf('Bootstrap finished: %d of %d iterations succeeded (%.1f%%).\n', n_converged, n_iter, 100*n_converged/n_iter);
+    if n_converged < 0.5 * n_iter
+        warning('Less than 50%% of bootstrap iterations converged. Results may be unreliable.');
+    elseif n_converged == 0
+        error('All bootstrap iterations failed. Check model, initial guess, and data quality.');
+    end
+
+    valid_profiles = all_fitted_profiles(convergence_flags, :);
+
+    ti_profile_avg = mean(valid_profiles, 1)';
+    ci_percentiles = prctile(valid_profiles, [2.5, 97.5], 1);
+    ti_profile_ci_lower = ci_percentiles(1, :)';
+    ti_profile_ci_upper = ci_percentiles(2, :)';
+
+    % --- 6. Package Results ---
+    temp_results.r_fine = r_fine;
+    temp_results.profile_primary_fit = ti_fit_primary;
+    temp_results.params_optimized.T0 = params_optimized(1);
+    temp_results.params_optimized.Ta = params_optimized(2);
+    temp_results.params_optimized.sigma = params_optimized(3);
+    temp_results.r_squared = r_squared;
+    temp_results.profile_avg = ti_profile_avg;
+    temp_results.profile_ci_lower = ti_profile_ci_lower;
+    temp_results.profile_ci_upper = ti_profile_ci_upper;
+    temp_results.bootstrap.all_fitted_profiles = valid_profiles; % Store only valid fits
+    temp_results.bootstrap.n_converged = n_converged;
+
+    fprintf('Ion temperature analysis finished in %.2f s.\n\n', toc(t_start));
 end
 
-% --- 5. Post-Process Bootstrap Results ---
-n_converged = sum(convergence_flags);
-n_failed = n_iter - n_converged;
-fprintf('Bootstrap finished: %d iterations succeeded, %d failed.\n', n_converged, n_failed);
-if n_converged < 0.5 * n_iter
-    warning('Less than 50%% of bootstrap iterations converged. Results may be unreliable.');
-end
-
-% Filter out any rows corresponding to failed iterations before calculating statistics
-valid_params   = all_fitted_params(convergence_flags, :);
-valid_profiles = all_fitted_profiles(convergence_flags, :);
-
-% Calculate mean profile, std dev, and confidence intervals from valid fits
-ti_profile_avg = mean(valid_profiles, 1)'; % Mean of rows, then transpose to column
-ti_profile_std = std(valid_profiles, 0, 1)';
-
-ci_percentiles = prctile(valid_profiles, [2.5, 97.5], 1);
-ti_profile_ci_lower = ci_percentiles(1, :)'; % Transpose to column
-ti_profile_ci_upper = ci_percentiles(2, :)'; % Transpose to column
-
-param_uncertainties = std(valid_params, 0, 1);
-
-% --- 6. Package Results into Output Structure ---
-temp_results.r_fine = r_fine;
-temp_results.profile_primary_fit = ti_fit_primary;
-temp_results.params_optimized.T0 = params_optimized(1);
-temp_results.params_optimized.Ta = params_optimized(2);
-temp_results.params_optimized.sigma = params_optimized(3);
-temp_results.r_squared = r_squared;
-temp_results.profile_avg = ti_profile_avg;
-temp_results.profile_std = ti_profile_std;
-temp_results.profile_ci_lower = ti_profile_ci_lower;
-temp_results.profile_ci_upper = ti_profile_ci_upper;
-temp_results.param_uncertainties.T0_err = param_uncertainties(1);
-temp_results.param_uncertainties.Ta_err = param_uncertainties(2);
-temp_results.param_uncertainties.sigma_err = param_uncertainties(3);
-temp_results.bootstrap.all_fitted_profiles = all_fitted_profiles(convergence_flags, :);
-temp_results.bootstrap.n_iterations = n_iter;
-temp_results.bootstrap.n_converged = n_converged;
-temp_results.bootstrap.n_failed = n_failed;
-temp_results.analysis_time_seconds = toc(t_start);
-
-fprintf('Ion temperature analysis finished in %.2f s.\n\n', temp_results.analysis_time_seconds);
-
-end
-
-% --- Local Helper Function for Numerical Stability ---
 function Ti = real_profile(params, r, a)
-    %REAL_PROFILE Safely evaluates the canonical Ti profile, ensuring a real-valued output.
-    T0 = params(1);
-    Ta = params(2);
-    sigma = params(3);
-    
+    %REAL_PROFILE Safely evaluates the canonical Ti profile.
+    T0 = params(1); Ta = params(2); sigma = params(3);
     base = 1 - (r(:) ./ a).^2;
-    % Clip negative values in the base that can arise from floating point errors
-    % near r=a. This prevents complex results when sigma is non-integer.
-    base(base < 0) = 0;
-    
+    base(base < 0) = 0; % Prevents complex results for non-integer sigma
     Ti = (T0 - Ta) .* (base .^ sigma) + Ta;
-    % Ensure output is a real, double-precision column vector.
     Ti = real(double(Ti(:)));
 end
