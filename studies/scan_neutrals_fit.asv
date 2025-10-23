@@ -32,11 +32,10 @@ function results = scan_neutrals_fit(velocity_results, temperature_results, ...
     
     fprintf('Starting grid scan (%d total points) using parallel pool...\n', num_calcs);
 
-    % Linter warnings for broadcast variables in this loop can be ignored:
-    % - 'params_list' is a sliced variable, which is efficient. The warning is a false positive.
-    % - 'theory_primary' is a necessary broadcast, which is the intended behavior.
+    % The 'theory_primary' vector is a necessary broadcast variable, as all
+    % workers need the full profile to compute the RMSE. This is expected.
     parfor i = 1:num_calcs
-        %#ok<PFOUS> Linter incorrectly flags params_list as a broadcast variable. It is sliced.
+        % Linter incorrectly flags params_list as a broadcast variable. It is sliced.
         r0  = params_list(i, 1);
         w   = params_list(i, 2);
         amp = params_list(i, 3);
