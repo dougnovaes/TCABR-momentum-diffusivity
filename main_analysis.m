@@ -66,8 +66,7 @@ plot_flags = struct( ...
     'justification_and_fits',  true, ...
     'thesis_method_results',   true, ...
     'supporting_profiles',     true, ...
-    'final_comparison',        true,  ... % Will use the new variants
-    'collisionality_comparison', true  ... % <-- NEW FLAG ADDED
+    'final_comparison',        true  ... % Will use the new variants
 );
 
 study_flags = struct( ...
@@ -216,13 +215,6 @@ if any([plot_flags_as_cell{:}])                 % Step 2: Using the variable
             % This new plot function uses the detailed variants
             plot_final_comparison_variants(effective_diffusivity_thesis, theoretical_variants, ...
                 constants, plots_dir);
-        end
-
-        if plot_flags.collisionality_comparison
-            % Esta função precisa dos 'derived_profiles' e dos 'velocity_results'
-            % e do resultado experimental 'effective_diffusivity_thesis'
-            plot_collisionality_comparison(derived_profiles, constants, velocity_results, ...
-                effective_diffusivity_thesis, plots_dir);
         end
         fprintf('--- Plotting complete. Figures saved to %s ---\n', plots_dir);
     catch ME
