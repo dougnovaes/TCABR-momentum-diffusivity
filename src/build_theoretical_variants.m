@@ -52,7 +52,7 @@ function [variants] = build_theoretical_variants(velocity_results, derived_profi
     n_iter = 1000; % Number of MC iterations for CIs
     fprintf('...running %d Monte Carlo iterations for uncertainty bands.\n', n_iter);
     
-    % Solomon et al. (2010) [cite_start]coefficients with errors [cite: 240]
+    % Solomon et al. (2010) coefficients with errors
     A = 6.09;  A_err = 0.72;
     B = 0.157; B_err = 0.072;
     C = -24.2; C_err = 3.5;
@@ -62,10 +62,7 @@ function [variants] = build_theoretical_variants(velocity_results, derived_profi
     B_samples = B + B_err * randn(n_iter, 1);
     C_samples = C + C_err * randn(n_iter, 1);
     
-    % Extract the Solomon-consistent collisionality for theoretical scaling laws.
-    % This is crucial for a valid comparison with the Solomon et al. (2010) regression.
-    nu_star_e = derived_profiles.collisionality.nu_star_e_solomon(:)'; % Ensure row vector for broadcasting
-    
+    nu_star_e = derived_profiles.collisionality.nu_star_e(:)'; % Ensure row vector for broadcasting
     R_coord = R0 * (1 + r_fine / R0);
     
     pinch_models = {'Solomon', 'Hahm', 'Gurcan', 'Peeters_Rln2', 'Peeters_Rln_calc'};
