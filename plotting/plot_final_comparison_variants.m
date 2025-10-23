@@ -79,7 +79,8 @@ function plot_final_comparison_variants(diffusivity_exp, variants, constants, sa
         % --- 2d. Formatting and Annotations ---
         xlabel('Normalised Radius ($r/a$)');
         ylabel('Effective Diffusivity, $\chi_{\phi, \mathrm{eff}}$ [m$^2$/s]');
-        title(sprintf('Effective Momentum Diffusivity: Experiment vs. %s Model', model_name));
+        title(sprintf('Effective Momentum Diffusivity: Experiment vs. %s Model', ...
+            strrep(model_name, '_', '\_')));
         xlim([0, 1]);
         ylim_upper = max(diffusivity_exp.ci_upper(r_norm > 0.1 & r_norm < 0.9));
         ylim([0, ylim_upper * 1.8]); % Dynamic y-limit
