@@ -226,12 +226,13 @@ end
 % =========================================================================
 % STUDY SECTION (optional)
 % =========================================================================
-if any(struct2array(study_flags))
+study_flags_as_cell = struct2cell(study_flags);
+if any([study_flags_as_cell{:}])
     fprintf('\n--- Running selected studies ---\n');
     if study_flags.neutral_scan
         try
-            run_scan_neutrals_fit(velocity_results, temperature_results, collision_profiles, ...
-                theoretical_variants, constants, r_fine, results_dir);
+            run_scan_neutrals_fit(velocity_results, temperature_results, theoretical_variants, ...
+                constants, r_fine, results_dir);
         catch ME
             warning(ME.identifier,'Neutral scan study failed: %s', ME.message);
             fprintf(2, 'Error occurred in file %s at line %d.\n', ME.stack(1).file, ME.stack(1).line);
