@@ -278,8 +278,3 @@ function scaling_law_results = stage7a_diffusivity_scaling(velocity_results, der
     % Note: Renamed to clarify this is the 'base' calculation
     scaling_law_results = compute_chi_eff_from_scalings(velocity_results, derived_profiles, constants, r_fine);
 end
-
-function theoretical_variants = stage7b_build_theoretical_variants(scaling_law_results, velocity_results, derived_profiles, constants, r_fine)
-    % This will be the new, powerful function for variant generation
-    theoretical_variants = build_theoretical_variants(scaling_law_results, velocity_results, derived_profiles, constants, r_fine);
-end
