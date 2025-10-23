@@ -41,7 +41,10 @@ function [derived_profiles] = compute_derived_profiles(exp_data, ...
 
     % Electron temperature profile is calculated analytically, as per original analysis.
     Te_mean = (509 - Ti_mean(end)) .* (1 - (r_fine / a).^2).^3.3 + Ti_mean(end); % [eV]
-
+    
+    % Local major radius
+    R_coord = R0 * (1 + r_fine / R0);
+    
     % --- 2. Safety Factor (q) and Magnetic Shear (s) ---
     fprintf('... calculating safety factor and magnetic shear\n');
     q_and_shear = struct();

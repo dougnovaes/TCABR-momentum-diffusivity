@@ -23,7 +23,8 @@ function [scaling_law_results] = compute_chi_eff_from_scalings_base(velocity_res
     % --- 1. Extract Profiles and Parameters ---
     a         = constants.machine.a;
     R0        = constants.machine.R0;
-    nu_star_e = derived_profiles.collisionality.nu_star_e;
+    % **CORRECTION**: Use the specific Solomon-consistent collisionality
+    nu_star_e = derived_profiles.collisionality.nu_star_e_solomon;
 
     % --- 2. Calculate Constant Gradient Values at Mid-Radius ---
     [~, idx_mid] = min(abs(r_fine - a * 0.5));
