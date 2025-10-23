@@ -1,4 +1,4 @@
-function [variants] = build_theoretical_variants(scaling_law_results, velocity_results, derived_profiles, constants, r_fine)
+function [variants] = build_theoretical_variants(velocity_results, derived_profiles, constants, r_fine)
 %BUILD_THEORETICAL_VARIANTS Systematically computes theoretical chi_phi_eff variants.
 %   This function explores the main ambiguities in the formula for effective
 %   momentum diffusivity from Peeters et al. (2007) by generating a matrix of
@@ -14,7 +14,6 @@ function [variants] = build_theoretical_variants(scaling_law_results, velocity_r
 %       variants = build_theoretical_variants(scaling_law_results, ...)
 
     arguments
-        scaling_law_results (1,1) struct
         velocity_results (1,1) struct
         derived_profiles (1,1) struct
         constants (1,1) struct
