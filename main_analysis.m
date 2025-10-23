@@ -52,14 +52,14 @@ if ~exist(plots_dir, 'dir'), mkdir(plots_dir); end
 % Set to 'false' to load from cache or skip plotting.
 
 run_flags = struct( ...
-    'setup_and_data',        false, ... % Stage 1
-    'profile_analyses',      false, ... % Stage 2
-    'physics_profiles',      false, ... % Stage 3
-    'theoretical_models',    false, ... % Stage 4
-    'neutral_and_collision', false, ... % Stage 5
-    'diffusivity_thesis',    false, ... % Stage 6
-    'diffusivity_scaling',   false, ... % Stage 7a
-    'build_variants',        false  ... % Stage 7b (New)
+    'setup_and_data',        true, ... % Stage 1
+    'profile_analyses',      true, ... % Stage 2
+    'physics_profiles',      true, ... % Stage 3
+    'theoretical_models',    true, ... % Stage 4
+    'neutral_and_collision', true, ... % Stage 5
+    'diffusivity_thesis',    true, ... % Stage 6
+    'diffusivity_scaling',   true, ... % Stage 7a
+    'build_variants',        true  ... % Stage 7b (New)
 );
 
 plot_flags = struct( ...

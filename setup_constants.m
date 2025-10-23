@@ -54,7 +54,7 @@ constants.models.neutrals = constants.defaults.neutrals_fit;
 
 % --- File Paths ---
 [base_dir, ~, ~] = fileparts(mfilename('fullpath'));
-project_root = fullfile(base_dir, '..'); % Assumes this file is in 'src'
+project_root = base_dir; % Assumes this file is in 'src'
 constants.data.filename = 'experimental_profiles.txt';
 constants.data.path = fullfile(project_root, 'data', constants.data.filename);
 

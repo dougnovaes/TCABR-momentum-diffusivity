@@ -1,0 +1,86 @@
+function results = scan_neutrals_fit(velocity_results, temperature_results, ...
+    variants, constants, r_fine, amps, widths, r0s, opts)
+%SCAN_NEUTRALS_FIT Performs a grid scan of neutral Gaussian parameters.
+%   Finds the optimal parameters (amplitude, width, peak position) for the
+%   neutral density profile by minimizing the RMSE between the resulting
+%   experimental chi_phi_eff and a specified theoretical variant.
+%   The scan loops are linearized for efficient parallel execution.
+
+    arguments
+        velocity_results (1,1) struct, temperature_results (1,1) struct
+        variants (1,1) struct, constants (1,1) struct, r_fine (:,1) double
+        amps (1,:) double, widths (1,:) double, r0s (1,:) double
+        opts (1,1) struct
+    end
+
+    % --- 1. Setup ---
+    safe_mask = variants.meta.safe_mask;
+    
+    ref_parts = split(opts.reference_theory, '.');
+    try
+        theory_ref_struct = variants.(ref_parts{1}).(ref_parts{2});
+        theory_primary = theory_ref_struct.profile_avg;
+    catch
+        error('Invalid reference theory string: ''%s''', opts.reference_theory);
+    end
+    
+    % --- 2. Linearize Scan Parameters for Efficient Parallelization ---
+    [R0_grid, W_grid, A_grid] = ndgrid(r0s, widths, amps);
+    params_list = [R0_grid(:), W_grid(:), A_grid(:)];
+    num_calcs = size(params_list, 1);
+    rmse_vector = nan(num_calcs, 1);
+    
+    fprintf('Starting grid scan (%d total points) using parallel pool...\n', num_calcs);
+
+    % The 'theory_primary' vector is a necessary broadcast variable, as all
+    % workers need the full profile to compute the RMSE. This is expected.
+    parfor i = 1:num_calcs
+        r0  = params_list(i, 1);
+        w   = params_list(i, 2);
+        amp = params_list(i, 3);
+        
+        % Create a temporary constants struct for this iteration
+        temp_constants = constants;
+        temp_constants.models.neutrals.n_H0_max_amp = amp;
+        temp_constants.models.neutrals.width = w;
+        temp_constants.models.neutrals.r_max_H_alpha = r0;
+        
+        % Recalculate the experimental diffusivity with these new params
+        neutral_prof = compute_neutral_density_profile(r_fine, temp_constants);
+        coll_prof = compute_collision_profiles(temperature_results, neutral_prof, r_fine);
+        diff_exp = compute_diffusivity_profile(velocity_results, coll_prof, r_fine);
+        
+        % Calculate RMSE on the safe radial window
+        residuals = diff_exp.profile_avg(safe_mask) - theory_primary(safe_mask);
+        rmse_vector(i) = sqrt(mean(residuals.^2));
+    end
+    
+    % --- 3. Find Best Result and Reshape RMSE data ---
+    RMSE_cube = reshape(rmse_vector, numel(r0s), numel(widths), numel(amps));
+    
+    [min_rmse, min_idx] = min(RMSE_cube(:));
+    [idx_r0, idx_w, idx_a] = ind2sub(size(RMSE_cube), min_idx);
+    
+    best = struct();
+    best.rmse = min_rmse;
+    best.amp = amps(idx_a);
+    best.width = widths(idx_w);
+    best.r0 = r0s(idx_r0);
+    
+    fprintf('Scan complete. Best RMSE = %.4f\n', best.rmse);
+    fprintf('  Best params: Amp=%.2e, Width=%.4f, r0=%.4f\n', best.amp, best.width, best.r0);
+
+    % --- 4. Package Results ---
+    results.opts = opts;
+    results.RMSE_cube = RMSE_cube;
+    results.amps = amps;
+    results.widths = widths;
+    results.r0s = r0s;
+    results.best = best;
+
+    % --- 5. Plotting ---
+    if opts.plot_results
+        fprintf('Generating study-specific plots...\n');
+        % (Plotting logic would go here)
+    end
+end
