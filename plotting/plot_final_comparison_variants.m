@@ -1,13 +1,8 @@
 function plot_final_comparison_variants(diffusivity_exp, variants, constants, save_dir)
-%PLOT_FINAL_COMPARISON_VARIANTS Generates a comprehensive set of experiment vs. theory comparison plots.
-%   This function creates a separate, publication-quality figure for each
-%   theoretical model found in the 'variants' structure.
-%
-%   Each figure includes:
-%   1. A "Theoretical Formulas" box in the top-right, displaying the relevant physics equations.
-%   2. An "intelligent" legend in the top-left, incorporating key numerical parameters.
-%   3. A detailed comparison of the experimental data against the four main
-%      theoretical variants for that model, all with 95% confidence intervals.
+%PLOT_FINAL_COMPARISON_VARIANTS Generates a final set of publication-quality comparison plots.
+%   This function creates a separate, highly polished figure for each
+%   theoretical model. Each figure is richly annotated with theoretical
+%   formulas and data-driven legends for maximum clarity and impact.
 
     arguments
         diffusivity_exp (1,1) struct
@@ -16,17 +11,16 @@ function plot_final_comparison_variants(diffusivity_exp, variants, constants, sa
         save_dir (1,1) string
     end
     
-    fprintf('Generating final comparison plots with formula annotations...\n');
+    fprintf('Generating final, publication-quality comparison plots...\n');
     
     % --- 1. Setup, Styles, and Formula Definitions ---
     r_norm = variants.meta.r_norm;
     colors = get(groot,'DefaultAxesColorOrder');
     meta = variants.meta;
 
-    % Create a map of LaTeX formulas for each model.
-    % Each entry contains two cells: {chi_phi formula, V_pinch formula}
+    % Create a map of LaTeX formulas for each pinch model.
     formula_map = containers.Map('KeyType', 'char', 'ValueType', 'any');
-    chi_solo_formula = '$\chi_{\phi}^{(\mathrm{Solo})} = (6.09 \pm 0.72)\nu_e^* + (0.157 \pm 0.072)R/L_n$';
+    chi_solo_formula = sprintf('$\\chi_{\\phi}^{(\\mathrm{Solo})} = (6.09 \\pm 0.72)\\nu_e^* + (0.157 \\pm 0.072)R/L_n$,\nwith $R/L_{n,mid}=%.2f$', meta.R_over_Ln_mid);
     formula_map('Solomon') = {chi_solo_formula, '$V_{\mathrm{pinch}}^{(\mathrm{Solo})} = (-24.2 \pm 3.5)\nu_e^*$';};
     formula_map('Hahm')    = {chi_solo_formula, '$V_{\mathrm{pinch}}^{(\mathrm{Hahm})} = -2 \chi_{\phi} / R_0$';};
     formula_map('Gurcan')  = {chi_solo_formula, '$V_{\mathrm{pinch}}^{(\mathrm{G\ddot{u}rc})} = -(2\chi_{\phi}/R) \cdot (F+r/R_0)$';};
@@ -35,12 +29,12 @@ function plot_final_comparison_variants(diffusivity_exp, variants, constants, sa
     
     general_formula = '$$\chi_{\phi, \mathrm{eff}} = \chi_{\phi} \left(1 + \frac{R \cdot V_{\mathrm{pinch}}}{\chi_{\phi}} \frac{1}{R/L_{V_{\phi}}}\right)$$';
     
-    % Define styles and legend text formats
+    % Define styles and new, explicit legend text formats
     variant_styles = {
-        {'DisplayName', 'Theory ($R_0$, grad @ mid = %.2f)',    'LineStyle', '--', 'Color', colors(2,:), 'LineWidth', 2.5},
-        {'DisplayName', 'Theory ($R_0$, grad profile)',           'LineStyle', '-.', 'Color', colors(3,:), 'LineWidth', 2.0},
-        {'DisplayName', 'Theory ($R(r)$, grad @ mid = %.2f)',   'LineStyle', ':',  'Color', colors(4,:), 'LineWidth', 2.5},
-        {'DisplayName', 'Theory ($R(r)$, grad profile)',          'LineStyle', '--', 'Color', colors(5,:), 'LineWidth', 2.0}
+        {'DisplayName', '$R=R_0$, $R/L_{V_\phi}=%.2f$',    'LineStyle', '--', 'Color', colors(2,:), 'LineWidth', 2.5},
+        {'DisplayName', '$R=R_0$, $R/L_{V_\phi}(r)$',      'LineStyle', '-.', 'Color', colors(3,:), 'LineWidth', 2.0},
+        {'DisplayName', '$R=R(r)$, $R/L_{V_\phi}=%.2f$',   'LineStyle', ':',  'Color', colors(4,:), 'LineWidth', 2.5},
+        {'DisplayName', '$R=R(r)$, $R/L_{V_\phi}(r)$',      'LineStyle', '--', 'Color', colors(5,:), 'LineWidth', 2.0}
     };
     variant_keys = {'R0_mid', 'R0_profile', 'Rlocal_mid', 'Rlocal_profile'};
 
@@ -52,15 +46,13 @@ function plot_final_comparison_variants(diffusivity_exp, variants, constants, sa
         model_name = pinch_models{i};
         model_data = variants.(model_name);
         
-        % Create figure, ensuring it is docked
         fig = figure('Name', ['Comparison vs. ', model_name], 'WindowStyle', 'docked');
         ax = gca;
         hold(ax, 'on');
 
         % --- 2a. Plot Experimental Data ---
         fill(ax, [r_norm; flipud(r_norm)], [diffusivity_exp.ci_lower; flipud(diffusivity_exp.ci_upper)], ...
-            colors(1,:), 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'DisplayName', '95\% CI (Exp.)'); % Corrected '%'
-            
+            colors(1,:), 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'DisplayName', '95\% CI (Exp.)');
         plot(ax, r_norm, diffusivity_exp.profile_avg, '-', 'LineWidth', 3.5, ...
             'Color', colors(1,:), 'DisplayName', '$\chi_{\phi, \mathrm{eff}}^{(\mathrm{exp})}$');
 
@@ -97,24 +89,22 @@ function plot_final_comparison_variants(diffusivity_exp, variants, constants, sa
         ylim_upper = max(diffusivity_exp.ci_upper(r_norm > 0.1 & r_norm < 0.9));
         xlim([0, 1]); ylim([0, ylim_upper * 1.8]);
         
-        % Create the intelligent legend in the top-left
-        legend_title_str = sprintf('Theoretical Variants\n(Base $\\chi_\\phi$ uses $R/L_{n,mid}=%.2f$)', meta.R_over_Ln_mid);
-        lgd = legend(ax, 'Location', 'northwest');
-        lgd.Title.String = legend_title_str;
-        lgd.Title.Interpreter = 'latex';
+        % Create legend at the top-center
+        lgd = legend(ax, 'Location', 'north');
+        lgd.Title.String = 'Theoretical Variants'; % Simple title
         
         set_publication_style(ax);
         
         % Create the theoretical formula annotation box in the top-right
         model_formulas = formula_map(model_name);
         anno_text = { ...
-            '\bf{Framework:}', general_formula, '', ...
-            '\bf{Base Diffusivity Model:}', model_formulas{1}, '', ...
+            '\bf{Framework:}', general_formula, ...
+            '\bf{Base Diffusivity:}', model_formulas{1}, ...
             '\bf{Pinch Model:}', model_formulas{2} ...
         };
-        annotation('textbox', [0.55, 0.65, 0.3, 0.3], 'String', anno_text, ...
-            'Interpreter', 'latex', 'FontSize', 14, 'FitBoxToText', 'on', ...
-            'BackgroundColor', [1, 1, 1, 0.85], 'EdgeColor', 'k');
+        annotation('textbox', [0.55, 0.68, 0.4, 0.2], 'String', anno_text, ...
+            'Interpreter', 'latex', 'FontSize', 13, 'FitBoxToText', 'on', ...
+            'BackgroundColor', [1, 1, 1, 0.85], 'EdgeColor', 'k', 'VerticalAlignment', 'top');
         
         hold(ax, 'off');
         
