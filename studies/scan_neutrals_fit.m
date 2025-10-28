@@ -91,7 +91,6 @@ function results = scan_neutrals_fit(velocity_results, temperature_results, ...
         try
             a = constants.machine.a; % Get minor radius
             r_norm = r_fine / a;     % Define r_norm for plotting
-            
             % Best r0 plane for heatmap
             [~, ir0_best] = min(abs(r0s - best.r0));
             
