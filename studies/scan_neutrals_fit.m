@@ -38,7 +38,7 @@ function results = scan_neutrals_fit(velocity_results, temperature_results, ...
     
     fprintf('Starting grid scan (%d total points) using parallel pool...\n', num_calcs);
 
-    parfor i = 1:num_calcs %#ok<PFEVB> 
+    parfor i = 1:num_calcs  
         r0  = params_list(i, 1);
         w   = params_list(i, 2);
         amp = params_list(i, 3);
@@ -89,6 +89,9 @@ function results = scan_neutrals_fit(velocity_results, temperature_results, ...
         
         % Plotting logic: Heatmap and Best fit overlay
         try
+            a = constants.machine.a; % Get minor radius
+            r_norm = r_fine / a;     % Define r_norm for plotting
+            
             % Best r0 plane for heatmap
             [~, ir0_best] = min(abs(r0s - best.r0));
             
@@ -141,8 +144,9 @@ function results = scan_neutrals_fit(velocity_results, temperature_results, ...
             savefig(fig_overlay, fullfile(scan_plots_dir, 'neutral_scan_best_overlay.fig'));
             
         catch ME_plot
-             warning('Failed to generate study plots: %s', ME_plot.message);
+            warning(ME_plot.identifier, 'scan_neutrals_fit: failed to generate study plots — %s', ME_plot.message);
         end
+
     elseif opts.plot_results && isnan(best.rmse)
         warning('Skipping study plots because scan failed to find a valid minimum RMSE.');
     end

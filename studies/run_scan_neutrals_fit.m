@@ -15,8 +15,8 @@ function run_scan_neutrals_fit(velocity_results, temperature_results, theoretica
 
     % --- 1. Define Parameter Ranges for the Scan ---
     amps = linspace(1.5e16, 3.0e16, 10);  % Amplitude of Gaussian peak [m^-3]
-    widths = linspace(0.018, 0.028, 10); % Gaussian width (penetration depth) [m]
-    r0s = linspace(0.15, 0.165, 5);      % Radial position of peak [m]
+    widths = linspace(0.020, 0.030, 10); % Gaussian width (penetration depth) [m]
+    r0s = linspace(0.160, 0.165, 5);      % Radial position of peak [m]
     
     % --- 2. Configure Scan Options ---
     opts = struct();

@@ -59,7 +59,7 @@ run_flags = struct( ...
     'neutral_and_collision', false, ... % Stage 5
     'diffusivity_thesis',    false, ... % Stage 6
     'diffusivity_scaling',   false, ... % Stage 7a
-    'build_variants',        false  ... % Stage 7b (New)
+    'build_variants',        false  ... % Stage 7b
 );
 
 plot_flags = struct( ...
