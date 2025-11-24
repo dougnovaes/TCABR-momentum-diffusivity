@@ -27,9 +27,9 @@ function run_scan_neutrals_fit(velocity_results, temperature_results, theoretica
     opts.reference_theory = 'Solomon.R0_mid'; 
 
     % --- 4. Execute the Scan ---
-    % Note: 'collision_profiles' is removed as it's not used.
+    % CORREÇÃO AQUI: Adicionado 'results_dir' ao final da lista de argumentos
     scan_results = scan_neutrals_fit(velocity_results, temperature_results, ...
-        theoretical_variants, constants, r_fine, amps, widths, r0s, opts);
+        theoretical_variants, constants, r_fine, amps, widths, r0s, opts, results_dir);
 
     % --- 5. Save Results ---
     scan_filename = fullfile(results_dir, 'study_neutral_scan_results.mat');
