@@ -52,25 +52,25 @@ if ~exist(plots_dir, 'dir'), mkdir(plots_dir); end
 % Set to 'false' to load from cache or skip plotting.
 
 run_flags = struct( ...
-    'setup_and_data',        true, ... % Stage 1
-    'profile_analyses',      true, ... % Stage 2
-    'physics_profiles',      true, ... % Stage 3
-    'theoretical_models',    true, ... % Stage 4
-    'neutral_and_collision', true, ... % Stage 5
-    'diffusivity_thesis',    true, ... % Stage 6
-    'diffusivity_scaling',   true, ... % Stage 7a
-    'build_variants',        true  ... % Stage 7b (New)
+    'setup_and_data',        false, ... % Stage 1
+    'profile_analyses',      false, ... % Stage 2
+    'physics_profiles',      false, ... % Stage 3
+    'theoretical_models',    false, ... % Stage 4
+    'neutral_and_collision', false, ... % Stage 5
+    'diffusivity_thesis',    false, ... % Stage 6
+    'diffusivity_scaling',   false, ... % Stage 7a
+    'build_variants',        false  ... % Stage 7b
 );
 
 plot_flags = struct( ...
-    'justification_and_fits',  true, ...
+    'justification_and_fits',  false, ...
     'thesis_method_results',   true, ...
-    'supporting_profiles',     true, ...
+    'supporting_profiles',     false, ...
     'final_comparison',        true  ... % Will use the new variants
 );
 
 study_flags = struct( ...
-    'neutral_scan', false ... % Activates studies/run_scan_neutrals_fit
+    'neutral_scan', true ... % Activates studies/run_scan_neutrals_fit
 );
 
 stop_on_error = true; % if true, halts execution upon any unhandled error
@@ -193,7 +193,8 @@ fprintf('\n>>> All calculation stages executed (or loaded) successfully.\n\n');
 % =========================================================================
 % PLOTTING SECTION
 % =========================================================================
-if any(struct2array(plot_flags))
+plot_flags_as_cell = struct2cell(plot_flags);   % Step 1: Store into a variable
+if any([plot_flags_as_cell{:}])                 % Step 2: Using the variable
     fprintf('--- Generating selected plots ---\n');
     try
         if plot_flags.justification_and_fits
@@ -225,14 +226,15 @@ end
 % =========================================================================
 % STUDY SECTION (optional)
 % =========================================================================
-if any(struct2array(study_flags))
+study_flags_as_cell = struct2cell(study_flags);
+if any([study_flags_as_cell{:}])
     fprintf('\n--- Running selected studies ---\n');
     if study_flags.neutral_scan
         try
-            run_scan_neutrals_fit(velocity_results, temperature_results, collision_profiles, ...
-                theoretical_variants, constants, r_fine, results_dir);
+            run_scan_neutrals_fit(velocity_results, temperature_results, theoretical_variants, ...
+                constants, r_fine, results_dir);
         catch ME
-            warning(ME.identifier,'Neutral scan study failed: %s', ME.message);
+            warning(ME.identifier, 'Neutral scan study failed: %s', ME.message);
             fprintf(2, 'Error occurred in file %s at line %d.\n', ME.stack(1).file, ME.stack(1).line);
         end
     end

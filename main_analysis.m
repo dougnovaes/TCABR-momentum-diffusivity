@@ -52,25 +52,25 @@ if ~exist(plots_dir, 'dir'), mkdir(plots_dir); end
 % Set to 'false' to load from cache or skip plotting.
 
 run_flags = struct( ...
-    'setup_and_data',        true, ... % Stage 1
-    'profile_analyses',      true, ... % Stage 2
-    'physics_profiles',      true, ... % Stage 3
-    'theoretical_models',    true, ... % Stage 4
-    'neutral_and_collision', true, ... % Stage 5
-    'diffusivity_thesis',    true, ... % Stage 6
-    'diffusivity_scaling',   true, ... % Stage 7a
-    'build_variants',        true  ... % Stage 7b
+    'setup_and_data',        false, ... % Stage 1
+    'profile_analyses',      false, ... % Stage 2
+    'physics_profiles',      false, ... % Stage 3
+    'theoretical_models',    false, ... % Stage 4
+    'neutral_and_collision', false, ... % Stage 5
+    'diffusivity_thesis',    false, ... % Stage 6
+    'diffusivity_scaling',   false, ... % Stage 7a
+    'build_variants',        false  ... % Stage 7b
 );
 
 plot_flags = struct( ...
-    'justification_and_fits',  true, ...
+    'justification_and_fits',  false, ...
     'thesis_method_results',   true, ...
-    'supporting_profiles',     true, ...
-    'final_comparison',        true  ... % Will use the new variants
+    'supporting_profiles',     false, ...
+    'final_comparison',        false  ... % Will use the new variants
 );
 
 study_flags = struct( ...
-    'neutral_scan', true ... % Activates studies/run_scan_neutrals_fit
+    'neutral_scan', false ... % Activates studies/run_scan_neutrals_fit
 );
 
 stop_on_error = true; % if true, halts execution upon any unhandled error
