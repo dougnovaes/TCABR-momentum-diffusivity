@@ -1,0 +1,186 @@
+function run_advanced_fit(velocity_results, collision_profiles, variants, constants, r_fine, results_dir)
+%RUN_ADVANCED_FIT Performs inverse analysis to estimate neutral density.
+%   This function assumes the theoretical effective diffusivity (Solomon with 
+%   local gradients) is the "ground truth" for transport physics and optimizes 
+%   a flexible parametric model (Pseudo-Voigt + Offset) for the experimental 
+%   diffusivity to match it.
+%
+%   Crucially, it applies a "Physical Validity Mask" to ignore regions where
+%   the theoretical model has mathematical singularities (where grad(V) ~ 0).
+
+    arguments
+        velocity_results (1,1) struct
+        collision_profiles (1,1) struct
+        variants (1,1) struct % REQUIRED: Contains the advanced profiles
+        constants (1,1) struct
+        r_fine (:,1) double
+        results_dir (1,1) string
+    end
+
+    fprintf('\n=== Starting Advanced Inverse Analysis (Voigt Fit) ===\n');
+
+    % --- 1. Setup Targets and Physics ---
+    a = constants.machine.a;
+    r_norm = r_fine / a;
+    
+    % DEFINE THE BENCHMARK: Solomon (R0) using LOCAL Profile Gradients
+    % This curve captures local physics variations (the "bumps") but has singularities.
+    if isfield(variants, 'chi_eff_R0_profile') && isfield(variants.chi_eff_R0_profile, 'Solo')
+        target_chi_profile = variants.chi_eff_R0_profile.Solo;
+        fprintf('Benchmark selected: Solomon (R0, Gradient Profiles)\n');
+    else
+        error('Advanced benchmark (Solomon R0_profile) not found in variants structure.');
+    end
+    
+    % Sanitize Target: Remove NaNs or negatives that might break optimization
+    target_chi_profile(isnan(target_chi_profile)) = 0;
+    target_chi_profile(target_chi_profile < 0) = 0;
+    
+    % --- 2. Construct the Physical Validity Mask ---
+    % Criteria A: User-specified radial range (avoid core sawteeth and extreme edge)
+    mask_range = (r_norm > 0.20) & (r_norm < 0.98);
+    
+    % Criteria B: Gradient Strength (Avoid singularities where R/L_Vphi ~ 0)
+    % We use the profile calculated in Stage 7b
+    if isfield(variants.meta, 'R_over_LVphi_profile')
+        R_over_LVphi = variants.meta.R_over_LVphi_profile;
+        % Threshold: Ignore regions where normalized gradient is less than 1.0
+        mask_physics = abs(R_over_LVphi) > 1.0; 
+    else
+        warning('R/L_Vphi profile not found in metadata. Using range mask only.');
+        mask_physics = true(size(r_norm));
+    end
+    
+    % Combine masks
+    mask = mask_range & mask_physics;
+    
+    fprintf('Mask applied: %d of %d points used for fitting (%.1f%%).\n', ...
+        sum(mask), numel(mask), 100*sum(mask)/numel(mask));
+
+    % Physics Factors for Inversion: chi_eff = [C_geo * <sv>_cx] * n_H0
+    C_geo = velocity_results.chi_phi_coeff; % Scalar [m^2]
+    sv_cx = collision_profiles.cx_rate.avg; % Profile [cm^3/s] (typically)
+    conversion_factor = 1e-6; % cm^3 -> m^3
+    
+    % Pre-calculate the inversion factor P(r) where nH0 = chi / P
+    physics_factor = C_geo .* (sv_cx .* conversion_factor);
+    physics_factor(physics_factor == 0) = eps; % Avoid division by zero
+    inv_physics_factor = 1 ./ physics_factor;
+
+    % --- 3. Configure Optimization (Pseudo-Voigt) ---
+    % Model: f(x) = Offset + Amp * [ eta * L(x) + (1-eta) * G(x) ]
+    % Params: [Amp, Center, Width(FWHM), Shape(eta), Offset]
+    
+    % Lower/Upper bounds
+    % Amp > 0, 0.5 < Center < 1.0, Width > 0.02, 0 <= eta <= 1, Offset >= 0
+    lb = [0.1,  0.5,  0.02, 0,   0];
+    ub = [100,  1.0,  0.4,  1,   20];
+    
+    % Initial guess
+    x0 = [10,   0.85, 0.15, 0.5, 1]; 
+
+    % Objective Function (RMSE calculated ONLY where mask is true)
+    objective_fun = @(p) rmse_voigt(p, r_norm, target_chi_profile, mask);
+
+    % Run Optimization
+    options = optimoptions('fmincon', 'Display', 'iter', 'Algorithm', 'sqp', 'StepTolerance', 1e-8);
+    fprintf('Optimizing Pseudo-Voigt parameters to match theoretical benchmark...\n');
+    
+    try
+        [p_opt, fval] = fmincon(objective_fun, x0, [],[],[],[], lb, ub, [], options);
+    catch ME
+        warning('Optimization failed: %s', ME.message);
+        return;
+    end
+
+    fprintf('Optimization complete. RMSE (masked): %.4f\n', fval);
+    fprintf('Parameters: Amp=%.2f, Center=%.2f, Width=%.3f, Eta=%.2f, Offset=%.2f\n', ...
+        p_opt(1), p_opt(2), p_opt(3), p_opt(4), p_opt(5));
+
+    % --- 4. Generate Optimized Profiles & Inversion ---
+    % Calculate the full profile (even outside the mask) to see the result
+    chi_fit = pseudo_voigt(p_opt, r_norm);
+    
+    % Invert to find Neutral Density: n_H0 = chi_fit / Physics_Factor
+    nH0_inferred = chi_fit .* inv_physics_factor;
+    
+    % Sanitize inferred nH0
+    nH0_inferred(~isfinite(nH0_inferred)) = 0;
+    nH0_inferred(nH0_inferred < 0) = 0;
+
+    % --- 5. Plotting Results ---
+    plot_advanced_results(r_norm, target_chi_profile, chi_fit, nH0_inferred, p_opt, mask, results_dir);
+    
+    % Save results
+    results_adv.p_opt = p_opt;
+    results_adv.chi_fit = chi_fit;
+    results_adv.nH0_inferred = nH0_inferred;
+    results_adv.target = target_chi_profile;
+    results_adv.mask = mask;
+    
+    save_path = fullfile(results_dir, 'advanced_fit_results.mat');
+    save(save_path, 'results_adv');
+    fprintf('Results saved to: %s\n', save_path);
+end
+
+% --- Helper Functions ---
+
+function val = pseudo_voigt(p, x)
+    % p = [Amp, Center, FWHM, Eta, Offset]
+    A = p(1); x0 = p(2); w = p(3); eta = p(4); C = p(5);
+    
+    % Gaussian part
+    sigma = w / (2 * sqrt(2 * log(2)));
+    G = exp( - (x - x0).^2 / (2 * sigma^2) );
+    
+    % Lorentzian part
+    gamma = w / 2;
+    L = 1 ./ ( 1 + ((x - x0)/gamma).^2 );
+    
+    % Linear combination (Pseudo-Voigt approximation)
+    val = C + A * ( eta * L + (1 - eta) * G );
+end
+
+function err = rmse_voigt(p, x, y_target, mask)
+    y_model = pseudo_voigt(p, x);
+    % Calculate error only where mask is true
+    residuals = y_model(mask) - y_target(mask);
+    err = sqrt(mean(residuals.^2));
+end
+
+function plot_advanced_results(r_norm, target, fit, nH0, params, mask, save_dir)
+    % Plot 1: Fit Quality with Mask Indication
+    f1 = figure('Name', 'Advanced Fit: Diffusivity', 'WindowStyle', 'docked');
+    ax1 = gca; hold on; box on; grid on;
+    
+    % Plot excluded regions (shaded)
+    y_lims = [0, max(max(target), max(fit))*1.1];
+    area(r_norm, ~mask * y_lims(2), 'FaceColor', [0.9 0.9 0.9], 'EdgeColor', 'none', 'DisplayName', 'Excluded Region');
+    
+    plot(ax1, r_norm, target, 'k--', 'LineWidth', 1.5, 'DisplayName', 'Benchmark: Solomon (Local Grads)');
+    plot(ax1, r_norm, fit, 'r-', 'LineWidth', 2.5, 'DisplayName', 'Optimised Fit (Voigt)');
+    
+    xlabel(ax1, 'r/a'); ylabel(ax1, '\chi_{\phi} [m^2/s]');
+    title(ax1, 'Inverse Analysis: Fitting Effective Diffusivity');
+    legend(ax1, 'Location', 'northwest');
+    ylim(ax1, y_lims);
+    xlim(ax1, [0, 1]);
+    
+    % Annotation
+    txt = sprintf('Offset: %.2f m^2/s\nCenter: %.2f\nWidth: %.3f', params(5), params(2), params(3));
+    text(ax1, 0.05, 0.5, txt, 'Units', 'normalized', 'BackgroundColor', 'w', 'EdgeColor', 'k');
+    
+    % Plot 2: Inferred Neutrals
+    f2 = figure('Name', 'Inferred Neutral Density', 'WindowStyle', 'docked');
+    ax2 = gca; hold on; box on; grid on;
+    plot(ax2, r_norm, nH0, 'b-', 'LineWidth', 2.5, 'DisplayName', 'Inferred n_{H0}');
+    xlabel(ax2, 'r/a'); ylabel(ax2, 'n_{H0} [m^{-3}]');
+    title(ax2, 'Inferred Neutral Density Profile (from Inverse Analysis)');
+    legend(ax2, 'Location', 'best');
+    
+    % Save
+    adv_dir = fullfile(save_dir, 'advanced_studies');
+    if ~exist(adv_dir, 'dir'), mkdir(adv_dir); end
+    saveas(f1, fullfile(adv_dir, 'adv_fit_diffusivity.png'));
+    saveas(f2, fullfile(adv_dir, 'adv_fit_neutrals.png'));
+end
