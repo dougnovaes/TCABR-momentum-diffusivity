@@ -35,13 +35,9 @@ function [derived_profiles] = compute_derived_profiles(exp_data, ...
     fq = exp(0.21303 .* r_fine ./ a); 
     q_profile = (r_fine ./ R0) .* (B_tor ./ B_pol_safe) ./ sqrt(1 - (r_fine ./ R0).^2) .* fq;
     q_profile(1) = q_profile(2); 
-    
-    % Calculate shear
-    s_profile_local = (r_fine ./ q_profile) .* gradient(q_profile, r_fine);
-    s_profile_local(1) = 0;
-
     q_and_shear.q_profile = q_profile;
-    q_and_shear.s_profile = s_profile_local;
+    q_and_shear.s_profile = (r_fine ./ q_profile) .* gradient(q_profile, r_fine);
+    q_and_shear.s_profile(1) = 0;
 
     % --- 3. Thermal Velocities ---
     fprintf('... calculating thermal velocities\n');
@@ -92,12 +88,13 @@ function [derived_profiles] = compute_derived_profiles(exp_data, ...
     collisionality.nu_star_i = collisionality.nu_star_i_wesson;
     collisionality.nu_star_e = collisionality.nu_star_e_wesson;
 
-    % 5b. Solomon/Maslov (Curvature Drift Frequency)
+    % 5b. Solomon/Maslov (Curvature Drift Frequency) - CORRECTION ADDED HERE
     % Definition: nu*_e = nu_ei / omega_De
     % omega_De = 2 * k_perp * rho_s * c_s / R
-    % with k_perp*rho_s ~ sqrt(0.1) [Maslov 2009]
+    % with k_perp*rho_s ~ sqrt(0.1)
     c_s = sqrt(e * Te_mean ./ mp); % Ion sound speed (approx)
-    % Removed unused Omega_ci and rho_s calculations
+    Omega_ci = e * constants.machine.B0 / mp; % Cyclotron freq using B0
+    rho_s = c_s ./ Omega_ci;
     
     k_perp_rho_s = sqrt(0.1); 
     omega_De = 2 * k_perp_rho_s .* c_s ./ R_coord;
@@ -108,16 +105,16 @@ function [derived_profiles] = compute_derived_profiles(exp_data, ...
     gradients = struct();
     gradients.R_over_Ln = R0 .* -gradient(log(ne_fine), r_fine);
 
-    % --- 7. Package Results into Output Structure ---
+    % --- 7. Package Results ---
     derived_profiles.r_fine     = r_fine;
     derived_profiles.q_profile  = q_profile;
-    derived_profiles.s_profile  = s_profile_local; % Fixed: using local var
+    derived_profiles.s_profile  = s_profile;
     derived_profiles.Te_profile = Te_mean;
     derived_profiles.v_th_i     = thermal_velocities.v_th_i;
     derived_profiles.v_th_e     = thermal_velocities.v_th_e;
-    derived_profiles.collisions = collisions;
+    derived_profiles.collisions = collisions; % Nested structure is safer
     
-    % Flatten collision fields for compatibility
+    % Flatten collision fields for compatibility if needed by plots
     derived_profiles.ln_lambda_ee = collisions.ln_lambda_ee;
     derived_profiles.ln_lambda_ei = collisions.ln_lambda_ei;
     derived_profiles.ln_lambda_ii = collisions.ln_lambda_ii;
@@ -135,6 +132,7 @@ function [derived_profiles] = compute_derived_profiles(exp_data, ...
     derived_profiles.collisionality = collisionality;
     derived_profiles.nu_star_i = collisionality.nu_star_i;
     derived_profiles.nu_star_e = collisionality.nu_star_e;
+    % Now this line will work because we calculated it in 5b:
     derived_profiles.nu_star_e_solomon = collisionality.nu_star_e_solomon; 
 
     derived_profiles.R_over_Ln  = gradients.R_over_Ln;

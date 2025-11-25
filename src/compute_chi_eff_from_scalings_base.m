@@ -23,7 +23,25 @@ function [scaling_law_results] = compute_chi_eff_from_scalings_base(velocity_res
     % --- 1. Extract Profiles and Parameters ---
     a         = constants.machine.a;
     R0        = constants.machine.R0;
-    nu_star_e = derived_profiles.collisionality.nu_star_e;
+    
+    % **CORRECTION 1**: Robustly access collisionality (Solomon preference)
+    if isfield(derived_profiles, 'nu_star_e_solomon')
+        nu_star_e = derived_profiles.nu_star_e_solomon;
+    elseif isfield(derived_profiles, 'collisionality') && isfield(derived_profiles.collisionality, 'nu_star_e_solomon')
+        nu_star_e = derived_profiles.collisionality.nu_star_e_solomon;
+    else
+        warning('Solomon collisionality not found. Using standard Wesson collisionality.');
+        nu_star_e = derived_profiles.nu_star_e;
+    end
+
+    % **CORRECTION 2**: Robustly access R/Ln (Handle flat structure vs substruct)
+    if isfield(derived_profiles, 'R_over_Ln')
+        R_over_Ln_profile = derived_profiles.R_over_Ln;
+    elseif isfield(derived_profiles, 'gradients') && isfield(derived_profiles.gradients, 'R_over_Ln')
+        R_over_Ln_profile = derived_profiles.gradients.R_over_Ln;
+    else
+        error('R/Ln profile not found in derived_profiles.');
+    end
 
     % --- 2. Calculate Constant Gradient Values at Mid-Radius ---
     [~, idx_mid] = min(abs(r_fine - a * 0.5));
@@ -31,10 +49,15 @@ function [scaling_law_results] = compute_chi_eff_from_scalings_base(velocity_res
     % R/L_Vphi = -R0 * (1/V_phi) * (dV_phi/dr)
     Vphi_profile = velocity_results.poly_fit_avg;
     grad_Vphi = gradient(Vphi_profile, r_fine);
-    R_over_LVphi_profile = -R0 ./ (Vphi_profile + eps) .* grad_Vphi;
+    % Guard against division by zero for robustness
+    Vphi_safe = Vphi_profile;
+    Vphi_safe(abs(Vphi_safe) < 1e-6) = 1e-6;
+    
+    R_over_LVphi_profile = -R0 ./ Vphi_safe .* grad_Vphi;
     R_over_LVphi_const = R_over_LVphi_profile(idx_mid);
 
-    R_over_Ln_const = derived_profiles.gradients.R_over_Ln(idx_mid);
+    % Value at mid-radius for the calculation
+    R_over_Ln_const = R_over_Ln_profile(idx_mid);
     
     fprintf('... using characteristic values at r/a=0.5: R/L_n = %.2f, R/L_Vphi = %.2f\n', ...
         R_over_Ln_const, R_over_LVphi_const);
