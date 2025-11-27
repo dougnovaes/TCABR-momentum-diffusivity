@@ -7,6 +7,15 @@ function [theoretical_models] = compute_theoretical_models(temperature_results, 
 %
 %   Syntax:
 %       theoretical_models = compute_theoretical_models(temp_results, mag_field, derived_profiles, constants)
+%
+%   Inputs:
+%       temperature_results - Structure with fitted Ti profile and parameters.
+%       magnetic_field     - Structure with B-field profiles.
+%       derived_profiles   - Structure with nu_star, R/Ln, etc.
+%       constants          - Structure with all project constants.
+%
+%   Output:
+%       theoretical_models - A structure containing all calculated theoretical profiles.
 
     arguments
         temperature_results (1,1) struct
@@ -24,26 +33,25 @@ function [theoretical_models] = compute_theoretical_models(temperature_results, 
     e_charge    = constants.physics.e_charge;
     epsilon     = constants.machine.epsilon_aspect_ratio;
     
-    % **CORRECTION 1**: Use the Solomon-consistent collisionality (Drift based)
-    % This is essential for valid comparison with Solomon et al. (2010) scaling laws.
+    % USE SOLOMON COLLISIONALITY (Drift based) for correct physics comparison
     if isfield(derived_profiles, 'nu_star_e_solomon')
         nu_star_e = derived_profiles.nu_star_e_solomon;
+    elseif isfield(derived_profiles.collisionality, 'nu_star_e_solomon')
+        nu_star_e = derived_profiles.collisionality.nu_star_e_solomon;
     else
         warning('Solomon collisionality not found. Using standard Wesson collisionality as fallback.');
         nu_star_e = derived_profiles.nu_star_e;
     end
 
-    % **CORRECTION 2**: Access R_over_Ln directly (flat structure)
-    % The previous error was caused by looking for derived_profiles.gradients.R_over_Ln
+    % Access R_over_Ln directly (flat structure)
     if isfield(derived_profiles, 'R_over_Ln')
         R_over_Ln = derived_profiles.R_over_Ln;
-    elseif isfield(derived_profiles, 'gradients') && isfield(derived_profiles.gradients, 'R_over_Ln')
-        R_over_Ln = derived_profiles.gradients.R_over_Ln;
     else
         error('R_over_Ln field not found in derived_profiles structure.');
     end
 
     % --- 2. Helander Model for Toroidal Velocity ---
+    % V_phi = (2*epsilon / (e*B_theta)) * (dT_i / dr)
     fprintf('... calculating Helander velocity profile\n');
 
     % Extract the optimised parameters from the temperature fit
@@ -65,8 +73,6 @@ function [theoretical_models] = compute_theoretical_models(temperature_results, 
     % --- 3. Solomon Model for Diffusivity and Pinch ---
     % Calculates momentum diffusivity (chi_phi) and pinch velocity (V_pinch)
     % based on the empirical scaling laws from Solomon et al. (2010).
-    % chi_phi = A * nu_e* + B * R/Ln
-    % V_pinch = C * nu_e*
     fprintf('... calculating Solomon diffusivity and pinch velocity profiles\n');
 
     % Coefficients from Solomon et al. (2010)

@@ -1,15 +1,11 @@
-function [scaling_law_results] = compute_chi_eff_from_scalings_base(velocity_results, derived_profiles, constants, r_fine)
-%COMPUTE_CHI_EFF_FROM_SCALINGS_BASE Calculates effective diffusivity from theoretical scaling laws (Base Method).
-%   This function computes theoretical profiles for chi_phi_eff based on the
-%   formula from Peeters et al. (2007) (Eq. 3.14 in the thesis):
-%       chi_phi_eff = chi_phi * (1 + (R*V_pinch/chi_phi) * (1 / (R/L_Vphi)))
+function [scaling_law_results] = compute_chi_eff_from_scalings(velocity_results, derived_profiles, constants, r_fine)
+%COMPUTE_CHI_EFF_FROM_SCALINGS Calculates effective diffusivity from theoretical scaling laws.
+%   This function computes theoretical profiles for the effective momentum
+%   diffusivity (chi_phi_eff) based on the formula from Peeters et al. (2007).
 %
-%   This is the BASELINE implementation, consistent with the original analysis,
-%   which uses characteristic, CONSTANT values for the normalised gradients
-%   (R/L_n, R/L_Vphi) evaluated at mid-radius (r/a = 0.5).
-%
-%   Syntax:
-%       scaling_law_results = compute_chi_eff_from_scalings_base(...)
+%   It uses a single model for the 'pure' diffusivity (Solomon) and combines
+%   it with various theoretical models for the pinch velocity (Solomon, Hahm,
+%   Gürcan, Peeters) to generate a set of comparable chi_phi_eff profiles.
 
     arguments
         velocity_results (1,1) struct
@@ -18,27 +14,25 @@ function [scaling_law_results] = compute_chi_eff_from_scalings_base(velocity_res
         r_fine (:,1) {mustBeNumeric, mustBeReal, mustBeFinite}
     end
 
-    fprintf('Calculating effective diffusivity from scaling laws (Base Method)...\n');
+    fprintf('Calculating effective diffusivity from scaling laws...\n');
 
     % --- 1. Extract Profiles and Parameters ---
     a         = constants.machine.a;
     R0        = constants.machine.R0;
     
-    % **CORRECTION 1**: Robustly access collisionality (Solomon preference)
+    % USE SOLOMON COLLISIONALITY (Drift based)
     if isfield(derived_profiles, 'nu_star_e_solomon')
         nu_star_e = derived_profiles.nu_star_e_solomon;
-    elseif isfield(derived_profiles, 'collisionality') && isfield(derived_profiles.collisionality, 'nu_star_e_solomon')
+    elseif isfield(derived_profiles.collisionality, 'nu_star_e_solomon')
         nu_star_e = derived_profiles.collisionality.nu_star_e_solomon;
     else
         warning('Solomon collisionality not found. Using standard Wesson collisionality.');
         nu_star_e = derived_profiles.nu_star_e;
     end
-
-    % **CORRECTION 2**: Robustly access R/Ln (Handle flat structure vs substruct)
+    
+    % Access R_over_Ln directly
     if isfield(derived_profiles, 'R_over_Ln')
         R_over_Ln_profile = derived_profiles.R_over_Ln;
-    elseif isfield(derived_profiles, 'gradients') && isfield(derived_profiles.gradients, 'R_over_Ln')
-        R_over_Ln_profile = derived_profiles.gradients.R_over_Ln;
     else
         error('R/Ln profile not found in derived_profiles.');
     end
@@ -76,7 +70,10 @@ function [scaling_law_results] = compute_chi_eff_from_scalings_base(velocity_res
     v_pinch_peeters_Rln2   = (chi_phi_solo_profile ./ R_coord) .* (-4 - 2);
     v_pinch_peeters_Rln_calc = (chi_phi_solo_profile ./ R_coord) .* (-4 - R_over_Ln_const);
 
+
     % --- 4. Calculate Effective Diffusivity for Each Combination ---
+    fprintf('... combining models to compute effective diffusivity profiles\n');
+    
     PinchNumber_Solo   = R0 * v_pinch_solo ./ chi_phi_solo_profile;
     PinchNumber_Hahm   = R0 * v_pinch_hahm ./ chi_phi_solo_profile;
     PinchNumber_Gurcan = R0 * v_pinch_gurcan ./ chi_phi_solo_profile;
@@ -92,13 +89,13 @@ function [scaling_law_results] = compute_chi_eff_from_scalings_base(velocity_res
     % --- 5. Package Results ---
     scaling_law_results.r_fine = r_fine;
     scaling_law_results.chi_phi_solo = chi_phi_solo_profile;
-    scaling_law_results.chi_eff.Solo = chi_eff_Solo;
-    scaling_law_results.chi_eff.Hahm = chi_eff_Hahm;
-    scaling_law_results.chi_eff.Gurcan = chi_eff_Gurcan;
-    scaling_law_results.chi_eff.Peeters_Rln2 = chi_eff_Peet_2;
-    scaling_law_results.chi_eff.Peeters_Rln_calc = chi_eff_Peet_C;
-    scaling_law_results.meta.R_over_LVphi_const = R_over_LVphi_const;
-    scaling_law_results.meta.R_over_Ln_const = R_over_Ln_const;
+    scaling_law_results.chi_eff_Solo = chi_eff_Solo;
+    scaling_law_results.chi_eff_Hahm = chi_eff_Hahm;
+    scaling_law_results.chi_eff_Gurcan = chi_eff_Gurcan;
+    scaling_law_results.chi_eff_Peeters_Rln2 = chi_eff_Peet_2;
+    scaling_law_results.chi_eff_Peeters_Rln_calc = chi_eff_Peet_C;
+    scaling_law_results.R_over_LVphi_const = R_over_LVphi_const;
+    scaling_law_results.R_over_Ln_const = R_over_Ln_const;
 
-    fprintf('Calculation of base effective diffusivity from scaling laws complete.\n\n');
+    fprintf('Calculation of effective diffusivity from scaling laws complete.\n\n');
 end

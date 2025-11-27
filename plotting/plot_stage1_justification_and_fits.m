@@ -46,7 +46,10 @@ function plot_stage1_justification_and_fits(constants, exp_data, velocity_result
     h2 = fill(ax2, [r_norm; flipud(r_norm)], [-velocity_results.poly_fit_ci_upper / 1000; -flipud(velocity_results.poly_fit_ci_lower / 1000)], ...
         'g', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', '95\% Confidence interval');
     h3 = plot(ax2, r_norm, -velocity_results.poly_fit_avg / 1000, 'g--', 'LineWidth', 5, 'DisplayName', '5th-order polynomial fit');
-    h4 = plot(ax2, r_norm, -theoretical_models.Vphi.Helander / 1000, 'r-', 'LineWidth', 4, 'DisplayName', 'Helander model');
+    
+    % CORRECTION: Access flat field Vphi_Helander instead of Vphi.Helander
+    h4 = plot(ax2, r_norm, -theoretical_models.Vphi_Helander / 1000, 'r-', 'LineWidth', 4, 'DisplayName', 'Helander model');
+    
     yline(ax2, 0, '--', 'HandleVisibility', 'off');
     xlabel(ax2, 'Normalised Radius ($r/a$)'); ylabel(ax2, 'Toroidal Velocity, $V_{\phi}$ (km/s)');
     title(ax2, 'Comparison with Helander Model');
