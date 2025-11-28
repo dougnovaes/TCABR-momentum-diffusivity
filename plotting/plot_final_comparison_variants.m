@@ -153,7 +153,7 @@ function plot_final_comparison_variants(diffusivity_exp, variants, constants, sa
         
         % Apply Fixed Y-Limit for Consistency
         xlim([0, 1]); 
-        ylim([0, 80]); % Fixed limit to accommodate high theoretical values
+        ylim([0, 25]); % Fixed limit to accommodate high theoretical values
         
         % Create legend at the top-center
         lgd = legend(ax, 'Location', 'north');
