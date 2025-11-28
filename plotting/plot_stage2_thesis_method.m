@@ -77,7 +77,7 @@ function plot_stage2_thesis_method(constants, neutral_profile, collision_profile
     xlabel(ax2_right, 'Normalised Radius ($r/a$)');
     ylabel(ax2_right, 'Effective Diffusivity, $\chi_{\phi}^{\mathrm{eff}}$ [m$^2$/s]');
     title(ax2_right, 'Effective Momentum Diffusivity');
-    xlim(ax2_right, [0, 1]); ylim(ax2_right, [0, 10]); 
+    xlim(ax2_right, [0, 1]); ylim(ax2_right, [0, 25]); 
     legend(ax2_right, 'show', 'Location', 'northwest'); 
     set_publication_style(ax2_right); hold(ax2_right, 'off');
     

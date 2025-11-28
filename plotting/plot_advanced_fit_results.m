@@ -32,7 +32,7 @@ function plot_advanced_fit_results(results_adv, save_dir)
     xlabel(ax1, 'r/a'); ylabel(ax1, '\chi_{\phi} [m^2/s]');
     title(ax1, 'Inverse Analysis: Fitting Effective Diffusivity');
     legend(ax1, 'Location', 'northwest');
-    ylim(ax1, [0, y_max*1.1]); xlim(ax1, [0, 1]);
+    ylim(ax1, [0, 65]); xlim(ax1, [0, 1]);
     
     txt = sprintf('Offset: %.2f m^2/s\nCenter: %.2f\nWidth: %.3f', params(5), params(2), params(3));
     text(ax1, 0.05, 0.5, txt, 'Units', 'normalized', 'BackgroundColor', 'w', 'EdgeColor', 'k');
