@@ -91,7 +91,7 @@ function validate_neutral_physics(constants, exp_data, derived_profiles, results
 
 end
 
-function plot_physics_validation(r_norm, nH0_inf, r_fit, n_fit, lambda_inf, lambda_theo, save_dir)
+function plot_physics_validation(r_norm, nH0_inf, ~, n_fit, lambda_inf, lambda_theo, save_dir)
     % Create plot
     f = figure('Name', 'Act 3: Physics Validation', 'WindowStyle', 'docked');
     ax = gca; hold on; box on; grid on;
