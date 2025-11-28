@@ -50,11 +50,14 @@ constants.defaults.neutrals_fit.width = 0.022;            % [m]
 % --- Active Model Parameters ---
 % Select which set of defaults to use for the current run.
 % To change the model, simply change the source struct here.
-constants.models.neutrals = constants.defaults.neutrals_fit;
+constants.models.neutrals = constants.defaults.neutrals_thesis; % for the validation run
+% constants.models.neutrals = constants.defaults.neutrals_fit; % for neutrals Voigt fit
 
 % --- File Paths ---
 [base_dir, ~, ~] = fileparts(mfilename('fullpath'));
-project_root = base_dir; % Assumes this file is in 'src'
+project_root = base_dir; % Assumes this file is in 'src' or root depending on layout. 
+% Adjust if setup_constants is in utils/ or src/ and needs to point to ../data
+% If setup_constants is in root:
 constants.data.filename = 'experimental_profiles.txt';
 constants.data.path = fullfile(project_root, 'data', constants.data.filename);
 

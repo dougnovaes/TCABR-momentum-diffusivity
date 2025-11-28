@@ -94,7 +94,7 @@ function [variants] = build_theoretical_variants(velocity_results, derived_profi
         % Pinch velocities
         v_pinch.Solomon = C_samples(i) * nu_star_e;
         v_pinch.Hahm = -2 * chi_phi_solo / R0;
-        v_pinch.Gurcan = -(2 * chi_phi_solo ./ R_coord') .* (1 + r_fine' / R0);
+        v_pinch.Gurcan = -(2 * chi_phi_solo ./ R_coord') .* (0.5 + r_fine' / R0);
         v_pinch.Peeters_Rln2 = (chi_phi_solo ./ R_coord') .* (-4 - 2);
         v_pinch.Peeters_Rln_calc = (chi_phi_solo ./ R_coord') .* (-4 - R_over_Ln_mid);
         
