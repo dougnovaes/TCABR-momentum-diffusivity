@@ -26,12 +26,11 @@ function plot_stage3_supporting_profiles(constants, derived_profiles, r_fine, sa
     ax1a = subplot(2, 2, 1); hold(ax1a, 'on'); grid(ax1a, 'on'); box(ax1a, 'on');
     yyaxis(ax1a, 'left');
     plot(ax1a, r_norm, derived_profiles.v_th_e, '-', 'LineWidth', 3, 'Color', colors(1,:));
-    ylabel(ax1a, 'Electrons, $v_\mathrm{th,e}$ (m/s)', 'Interpreter', 'latex'); ax1a.YColor = colors(1,:); ylim(ax1a, [0, 2e7]);
+    ylabel(ax1a, '$v_\mathrm{th,e}$ (m/s)', 'Interpreter', 'latex'); ax1a.YColor = colors(1,:); ylim(ax1a, [0, 2e7]);
     yyaxis(ax1a, 'right');
     plot(ax1a, r_norm, derived_profiles.v_th_i, '-', 'LineWidth', 3, 'Color', colors(2,:));
-    ylabel(ax1a, 'Ions, $v_\mathrm{th,i}$ (m/s)', 'Interpreter', 'latex'); ax1a.YColor = colors(2,:); ylim(ax1a, [0, 3e5]);
-    xlabel(ax1a, '$r/a$'); 
-    title(ax1a, '(a) Thermal Velocities'); xlim(ax1a, [0, 1]);
+    ylabel(ax1a, 'Ion Thermal Velocity, $v_\mathrm{th,i}$ (m/s)', 'Interpreter', 'latex'); ax1a.YColor = colors(2,:); ylim(ax1a, [0, 3e5]);
+    xlabel(ax1a, 'Normalised Radius ($r/a$)'); title(ax1a, '(a) ElectronThermal Velocities'); xlim(ax1a, [0, 1]);
     set_publication_style(ax1a);
     
     % Subplot (b): Coulomb Logarithms
@@ -39,7 +38,7 @@ function plot_stage3_supporting_profiles(constants, derived_profiles, r_fine, sa
     plot(ax1b, r_norm, derived_profiles.ln_lambda_ee, 'LineWidth', 3, 'DisplayName', '$\lambda_{ee}$');
     plot(ax1b, r_norm, derived_profiles.ln_lambda_ei, 'LineWidth', 3, 'DisplayName', '$\lambda_{ei}$');
     plot(ax1b, r_norm, derived_profiles.ln_lambda_ii, 'LineWidth', 3, 'DisplayName', '$\lambda_{ii}$');
-    xlabel(ax1b, '$r/a$'); ylabel(ax1b, 'Coulomb Logarithm, $\ln\Lambda$');
+    xlabel(ax1b, 'Normalised Radius ($r/a$)'); ylabel(ax1b, 'Coulomb Logarithm, $\ln\Lambda$');
     title(ax1b, '(b) Coulomb Logarithms'); xlim(ax1b, [0, 1]); ylim(ax1b, [13, 17]);
     legend(ax1b, 'show', 'Location', 'best'); set_publication_style(ax1b);
 
@@ -50,14 +49,14 @@ function plot_stage3_supporting_profiles(constants, derived_profiles, r_fine, sa
     plot(ax1c, r_norm, derived_profiles.q_profile, '-', 'LineWidth', 3, 'DisplayName', 'Safety Factor $q$');
     plot(ax1c, r_norm, derived_profiles.s_profile, '--', 'LineWidth', 3, 'DisplayName', 'Magnetic Shear $s$');
     
-    xlabel(ax1c, '$r/a$'); ylabel(ax1c, 'Value'); title(ax1c, '(c) Safety Factor and Shear');
+    xlabel(ax1c, 'Normalised Radius ($r/a$)'); ylabel(ax1c, 'Value'); title(ax1c, '(c) Safety Factor and Shear');
     xlim(ax1c, [0, 1]); ylim(ax1c, [0, 4]); legend(ax1c, 'show', 'Location', 'best'); set_publication_style(ax1c);
 
     % Subplot (d): Collisionality
     ax1d = subplot(2, 2, 4); hold(ax1d, 'on'); grid(ax1d, 'on'); box(ax1d, 'on');
     plot(ax1d, r_norm, derived_profiles.nu_star_i, '-', 'LineWidth', 3, 'DisplayName', 'Ion Collisionality ($\nu_{*i}$)');
     plot(ax1d, r_norm, derived_profiles.nu_star_e, '--', 'LineWidth', 3, 'DisplayName', 'Electron Collisionality ($\nu_{*e}$)');
-    xlabel(ax1d, '$r/a$'); ylabel(ax1d, 'Collisionality, $\nu_*$');
+    xlabel(ax1d, 'Normalised Radius ($r/a$)'); ylabel(ax1d, 'Collisionality, $\nu_*$');
     title(ax1d, '(d) Collisionality Profiles'); xlim(ax1d, [0, 1]); ylim(ax1d, [0, 4]);
     legend(ax1d, 'show', 'Location', 'best'); set_publication_style(ax1d);
     saveas(fig1, fullfile(save_dir, 'stage3_fundamental_profiles.png')); savefig(fig1, fullfile(save_dir, 'stage3_fundamental_profiles.fig'));

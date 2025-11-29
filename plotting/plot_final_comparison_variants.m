@@ -1,11 +1,14 @@
 function plot_final_comparison_variants(diffusivity_exp, variants, constants, save_dir)
-%PLOT_FINAL_COMPARISON_VARIANTS Generates a final set of publication-quality comparison plots.
-%   This function creates a separate, highly polished figure for each
-%   theoretical model. Each figure is richly annotated with theoretical
-%   formulas and data-driven legends for maximum clarity and impact.
+%PLOT_FINAL_COMPARISON_VARIANTS Generates consolidated comparison plots.
+%   Produces two publication-quality figures:
+%   1. Comparison of Pinch Mechanisms (Solomon, Hahm, Gurcan).
+%   2. Sensitivity to Density Gradient (Peeters models).
 %
-%   UPDATED: Now dynamically adjusts Y-axis limits to accommodate both
-%   experimental data and theoretical curves, ignoring singularities.
+%   VISUALIZATION LOGIC:
+%   - Uses fixed variant: Global R0 + Local Velocity Gradient (R0_profile).
+%   - Y-axis fixed at [0, 25] m^2/s for consistency.
+%   - Experimental data and Solomon base: FULL range 0 <= r/a <= 1
+%   - Theoretical comparison curves: CROPPED to 0.14 <= r/a <= 0.99
 
     arguments
         diffusivity_exp (1,1) struct
@@ -14,171 +17,192 @@ function plot_final_comparison_variants(diffusivity_exp, variants, constants, sa
         save_dir (1,1) string
     end
     
-    fprintf('Generating final, publication-quality comparison plots...\n');
+    fprintf('Generating final consolidated comparison plots...\n');
     
-    % --- 1. Setup, Styles, and Formula Definitions ---
+    % --- Setup ---
     r_norm = variants.meta.r_norm;
     colors = get(groot,'DefaultAxesColorOrder');
     meta = variants.meta;
-
-    % Create a map of LaTeX formulas for each pinch model using robust delimiters.
-    formula_map = containers.Map('KeyType', 'char', 'ValueType', 'any');
     
-    % Construct chi_solo_formula carefully
-    chi_solo_base = '\(\chi_{\varphi}^{(\mathrm{Solomon})} = (6.09 \pm 0.72)\nu_e^* + (0.157 \pm 0.072)R/L_n\)';
-    rln_mid_text = sprintf(',\nwith \\(R/L_{n,mid}=%.2f\\)', meta.R_over_Ln_mid);
-    chi_solo_formula = [chi_solo_base, rln_mid_text]; % Concatenate parts
-
-    % Define formulas using \( \)
-    formula_map('Solomon') = {chi_solo_formula, '\(V_{\mathrm{pinch}}^{(\mathrm{Solomon})} = (-24.2 \pm 3.5)\nu_e^*\)'};
-    formula_map('Hahm')    = {chi_solo_formula, '\(V_{\mathrm{pinch}}^{(\mathrm{Hahm})} = -2 \chi_{\varphi} / R_0\)'};
-    formula_map('Gurcan')  = {chi_solo_formula, '\(V_{\mathrm{pinch}}^{(\mathrm{G\ddot{u}rcan})} = -(2\chi_{\varphi}/R) \cdot (F+r/R_0)\)'};
-    formula_map('Peeters_Rln2') = {chi_solo_formula, '\(V_{\mathrm{pinch}}^{(\mathrm{Peeters})} = (\chi_{\varphi}/R) \cdot (-4 - R/L_n)\), with \(R/L_n=2\)'};
-    formula_map('Peeters_Rln_calc') = {chi_solo_formula, '\(V_{\mathrm{pinch}}^{(\mathrm{Peeters})} = (\chi_{\varphi}/R) \cdot (-4 - R/L_n)\)'};
+    % Define Plotting Limits (Radial Crop) - ONLY for theoretical curves
+    R_MIN = 0.14;
+    R_MAX = 0.99;
     
-    % General formula using $$ remains okay
-    general_formula = ['$$\chi_{\varphi}^{\mathrm{eff}} = \chi_{\varphi} \left(1 + \frac{R \cdot V_{\mathrm{pinch}}}{\chi_{\varphi}} ' ...
-        '\frac{1}{R/L_{V_{\varphi}}}\right)$$'];
+    % Helper to compute mask indices for theoretical curves
+    get_mask = @(r) (r >= R_MIN) & (r <= R_MAX);
     
-    % Define styles with SIMPLE TEXT (no LaTeX) for legend entries
-    variant_styles = {
-        {'DisplayName', '$R=R_0, R/L_{V_{\varphi}}=%.2f$',    'LineStyle', '--', 'Color', colors(2,:), 'LineWidth', 2.5},
-        {'DisplayName', '$R=R_0, R/L_{V_{\varphi}}(r)$',      'LineStyle', '-.', 'Color', colors(3,:), 'LineWidth', 2.0},
-        {'DisplayName', '$R=R(r), R/L_{V_{\varphi}}=%.2f$',   'LineStyle', ':',  'Color', colors(4,:), 'LineWidth', 2.5},
-        {'DisplayName', '$R=R(r), R/L_{V_{\varphi}}(r)$',     'LineStyle', '--', 'Color', colors(5,:), 'LineWidth', 2.0}
-    };
-    variant_keys = {'R0_mid', 'R0_profile', 'Rlocal_mid', 'Rlocal_profile'};
+    % Pre-calculate mask for theoretical grid
+    mask_theo = get_mask(r_norm);
+    
+    % --- CONFIGURATION: Colors ---
+    % Change 'base_color' here to modify the Solomon Base line color.
+    % Example: 'k' (black), 'r' (red), or RGB [0.4 0.4 0.4] (dark gray)
+    base_color = 'k'; 
+    
+    % Define LaTeX formulas
+    chi_solo_formula = sprintf('$\\chi_{\\phi}^{(\\mathrm{Solo})} = (6.09 \\pm 0.72)\\nu_e^* + (0.157 \\pm 0.072)R/L_n$,\nwith $R/L_{n,mid}=%.2f$', meta.R_over_Ln_mid);
+    general_formula = '$$\chi_{\phi}^{\mathrm{eff}} = \chi_{\phi} \left(1 + \frac{R \cdot V_{\mathrm{pinch}}}{\chi_{\phi}} \frac{1}{R/L_{V_{\phi}}}\right)$$';
 
-    pinch_models = fieldnames(variants);
-    pinch_models = pinch_models(~strcmp(pinch_models, 'meta'));
-    % --- END OF SECTION 1 ---
-
-    % --- 2. Loop Through Each Model and Generate a Figure ---
-    for i = 1:numel(pinch_models)
-        model_name = pinch_models{i};
-        model_data = variants.(model_name);
-        
-        fig = figure('Name', ['Comparison vs. ', model_name], 'WindowStyle', 'docked');
-        ax = gca;
-        hold(ax, 'on');
-
-        % --- 2a. Plot Experimental Data ---
-        fill(ax, [r_norm; flipud(r_norm)], [diffusivity_exp.ci_lower; flipud(diffusivity_exp.ci_upper)], ...
-            colors(1,:), 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'DisplayName', '95\% CI (Exp.)');
-        plot(ax, r_norm, diffusivity_exp.profile_avg, '-', 'LineWidth', 3.5, ...
-            'Color', colors(1,:), 'DisplayName', '$\chi_\varphi^{\mathrm{eff}}\ \text{(Exp.)}$');
-
-        % --- 2b. Plot Pure Diffusivity Baseline ---
-        plot(ax, r_norm, meta.chi_phi_solo_avg, ':', 'LineWidth', 2, 'Color', 'k', ...
-            'DisplayName', '$\chi_\varphi\ \text{(Solomon base)}$');
-
-        % --- Track Max Value for Y-Limit ---
-        % Start with max of experimental data (in valid range)
-        % We use a range [0.2, 0.95] to avoid edge singularities and core noise
-        mask_lims = r_norm >= 0.2 & r_norm <= 0.95;
-        
-        % Initialize max_val with experiment and base theory
-        max_val = max(diffusivity_exp.ci_upper(mask_lims)); 
-        max_val = max(max_val, max(meta.chi_phi_solo_avg(mask_lims)));
-
-        % --- 2c. Loop Through and Plot the Four Variants ---
-        for j = 1:numel(variant_keys)
-            key = variant_keys{j};
-            if isfield(model_data, key)
-                var_data = model_data.(key);
-                style_properties = variant_styles{j};
-                
-                % Extract the DisplayName template
-                display_name_template = '';
-                style_args = {};
-                is_display_name = false;
-                for k = 1:2:numel(style_properties)
-                    prop_name = style_properties{k};
-                    prop_value = style_properties{k+1};
-                    if strcmpi(prop_name, 'DisplayName')
-                        display_name_template = prop_value;
-                        is_display_name = true;
-                    else
-                        style_args = [style_args, {prop_name, prop_value}];
-                    end
-                end
-                if ~is_display_name
-                    error('DisplayName not found in variant_styles for key %s', key);
-                end
-
-                % --- SIMPLE LOGIC FOR LEGEND DISPLAY NAMES ---
-                is_mid_variant = any(strcmp(key, {'R0_mid', 'Rlocal_mid'}));
-                
-                if is_mid_variant
-                    if isfield(meta, 'R_over_LVphi_mid') && ~isnan(meta.R_over_LVphi_mid)
-                        display_name = sprintf(display_name_template, meta.R_over_LVphi_mid);
-                    else
-                        display_name = display_name_template;
-                    end
-                else
-                    display_name = display_name_template;
-                end
-
-                % Determine Color
-                col = [];
-                for pp = 1:2:numel(style_properties)
-                    if strcmpi(style_properties{pp}, 'Color')
-                        col = style_properties{pp+1};
-                        break;
-                    end
-                end
-                if isempty(col)
-                    col = colors(mod(j-1,size(colors,1))+1,:);
-                end
-
-                % Plot
-                fill(ax, [r_norm; flipud(r_norm)], [var_data.ci_lower; flipud(var_data.ci_upper)], ...
-                     col, 'FaceAlpha', 0.10, 'EdgeColor', 'none', 'HandleVisibility', 'off');
-                plot(ax, r_norm, var_data.profile_avg, 'DisplayName', display_name, style_args{:});
-                
-                % --- Update Max Value for Y-Limit ---
-                % Check max of this variant's CI upper bound within mask
-                local_max = max(var_data.ci_upper(mask_lims));
-                if ~isempty(local_max) && isfinite(local_max)
-                    max_val = max(max_val, local_max);
-                end
-            end
+    % --- Common Plotting Helper ---
+    function plot_base_layers(ax)
+        % 1. Experimental Data (Blue band and line) - FULL RANGE
+        if isfield(diffusivity_exp, 'r_fine')
+            r_exp_norm = diffusivity_exp.r_fine / constants.machine.a;
+        else
+            r_exp_norm = r_norm; 
         end
-
-        % --- 2d. Formatting, Legend and Annotations ---
-        xlabel('Normalised Radius ($r/a$)', 'Interpreter', 'latex');
-        ylabel('Effective Diffusivity, $\chi_{\varphi}^{\mathrm{eff}}$ [m$^2$/s]', 'Interpreter', 'latex');
-        title_str = sprintf('Effective Momentum Diffusivity: Experiment vs. %s Scalling Law', strrep(model_name, '_', '\_'));
-        title(title_str, 'Interpreter', 'latex');
+        % Experimental CI
+        fill(ax, [r_exp_norm; flipud(r_exp_norm)], [diffusivity_exp.ci_lower; flipud(diffusivity_exp.ci_upper)], ...
+            colors(1,:), 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'DisplayName', '95\% CI (Exp.)');
+        % Experimental Mean
+        plot(ax, r_exp_norm, diffusivity_exp.profile_avg, '-', 'LineWidth', 3.5, ...
+            'Color', colors(1,:), 'DisplayName', '$\chi_\phi^{\mathrm{eff}}\ \text{(Exp.)}$');
         
-        % Apply Fixed Y-Limit for Consistency
-        xlim([0, 1]); 
-        ylim([0, 25]); % Fixed limit to accommodate high theoretical values
+        % 2. Base Diffusivity (Solomon) - FULL RANGE with Confidence Band
+        if isfield(meta, 'chi_phi_solo_lower')
+            % Base CI (Faint gray band around the dotted line)
+            % Using [0.6 0.6 0.6] for shadow if base is black, or tint of base_color
+            fill(ax, [r_norm; flipud(r_norm)], [meta.chi_phi_solo_lower; flipud(meta.chi_phi_solo_upper)], ...
+                 [0.6 0.6 0.6], 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+        end
         
-        % Create legend at the top-center
-        lgd = legend(ax, 'Location', 'north');
-        set(lgd, 'Interpreter', 'latex'); 
-        lgd.Box = 'off';
-        
-        set_publication_style(ax);
-        
-        % Create the theoretical formula annotation box (keeping layout)
-        model_formulas = formula_map(model_name);
-        anno_text = { ...
-            '\bf{Framework:}', general_formula, ...
-            '\bf{Base Diffusivity:}', model_formulas{1}, ...
-            '\bf{Pinch Model:}', model_formulas{2} ...
-        };
-        annotation('textbox', [0.25, 0.35, 0.4, 0.2], 'String', anno_text, ...
-            'Interpreter', 'latex', 'FontSize', 16, 'FitBoxToText', 'on', ...
-            'BackgroundColor', [1, 1, 1, 0.85], 'EdgeColor', 'k', 'VerticalAlignment', 'top');
-        
-        hold(ax, 'off');
-        
-        % --- 2e. Save the Figure ---
-        fig_filename = fullfile(save_dir, ['final_comparison_', model_name, '.png']);
-        saveas(fig, fig_filename);
-        savefig(fig, strrep(fig_filename, '.png', '.fig'));
-        fprintf('...plot saved to %s\n', fig_filename);
+        % Base Mean Line
+        plot(ax, r_norm, meta.chi_phi_solo_avg, ':', 'LineWidth', 2, 'Color', base_color, ...
+            'DisplayName', '$\chi_\phi\ \text{(Solomon base)}$');
     end
+
+    % =====================================================================
+    % FIGURE 1: COMPARISON OF PINCH MECHANISMS (Solomon, Hahm, Gurcan)
+    % =====================================================================
+    fig1 = figure('Name', 'Comparison: Pinch Mechanisms', 'WindowStyle', 'docked');
+    ax1 = gca; hold(ax1, 'on');
+    
+    plot_base_layers(ax1);
+    
+    % Define Models to Plot
+    mech_models = {'Solomon', 'Hahm', 'Gurcan'};
+    mech_colors = [0.9290 0.6940 0.1250;  % Yellow (Solomon)
+                   0.4940 0.1840 0.5560;  % Purple (Hahm)
+                   0.4660 0.6740 0.1880]; % Green (Gurcan)
+    mech_linewidths = [2.5, 4.0, 2.5];    % LineWidth for each model (Solomon, Hahm, Gurcan)
+    
+    
+    % Loop and Plot Variants (CROPPED)
+    for i = 1:numel(mech_models)
+        name = mech_models{i};
+        if isfield(variants, name)
+            % Use "R0_profile" variant (Global R, Local Grads)
+            data = variants.(name).R0_profile; 
+            col = mech_colors(i,:);
+            
+            % Apply Mask - CROPPED theoretical curves
+            r_t = r_norm(mask_theo);
+            prof_t = data.profile_avg(mask_theo);
+            ci_lo_t = data.ci_lower(mask_theo);
+            ci_up_t = data.ci_upper(mask_theo);
+            
+            % Plot CI (faint)
+            fill(ax1, [r_t; flipud(r_t)], [ci_lo_t; flipud(ci_up_t)], ...
+                 col, 'FaceAlpha', 0.08, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+            % Plot Mean Line
+            plot(ax1, r_t, prof_t, '--', 'LineWidth', mech_linewidths(i), 'Color', col, ...
+                 'DisplayName', sprintf('%s Model', name));
+        end
+    end
+    
+    % Formatting
+    xlabel(ax1, 'Normalised Radius ($r/a$)', 'Interpreter', 'latex');
+    ylabel(ax1, 'Effective Diffusivity [m$^2$/s]', 'Interpreter', 'latex');
+    title(ax1, 'Comparison of Pinch Mechanisms (TEP vs Coriolis)', 'Interpreter', 'latex');
+    
+    % Fixed Scale (0 to 25 as requested)
+    xlim(ax1, [0, 1]); ylim(ax1, [0, 25]);
+    
+    legend(ax1, 'Location', 'northwest', 'Interpreter', 'latex', 'Box', 'off', 'NumColumns', 1);
+    set_publication_style(ax1);
+    
+    % Annotation Box
+    anno_text1 = { ...
+        '\bf{Framework:}', general_formula, ...
+        '\bf{Base Diffusivity:}', chi_solo_formula, ...
+        '\bf{Pinch Models:}', ...
+        '$V_{\mathrm{pinch}}^{(\mathrm{Solo})} = (-24.2 \pm 3.5)\nu_e^*$', ...
+        '$V_{\mathrm{pinch}}^{(\mathrm{Hahm})} = -2 \chi_{\phi} / R_0$', ...
+        '$V_{\mathrm{pinch}}^{(\mathrm{G\ddot{u}rc})} = -(2\chi_{\phi}/R) \cdot (F+r/R_0)$'
+    };
+    annotation('textbox', [0.33, 0.55, 0.38, 0.35], 'String', anno_text1, ...
+        'Interpreter', 'latex', 'FontSize', 16, 'FitBoxToText', 'on', ...
+        'BackgroundColor', [1, 1, 1, 0.85], 'EdgeColor', 'k', 'VerticalAlignment', 'top');
+    
+    saveas(fig1, fullfile(save_dir, 'final_comparison_mechanisms.png'));
+    savefig(fig1, fullfile(save_dir, 'final_comparison_mechanisms.fig'));
+
+    % =====================================================================
+    % FIGURE 2: SENSITIVITY TO DENSITY GRADIENT (Peeters)
+    % =====================================================================
+    fig2 = figure('Name', 'Comparison: Peeters Sensitivity', 'WindowStyle', 'docked');
+    ax2 = gca; hold(ax2, 'on');
+    
+    plot_base_layers(ax2);
+    
+    % Prepare common masking variables for theoretical curves (CROPPED)
+    r_t = r_norm(mask_theo);
+    
+    % Peeters R/Ln = 2 (Standard) - CROPPED
+    if isfield(variants, 'Peeters_Rln2')
+        data = variants.Peeters_Rln2.R0_profile;
+        col = [0.8500 0.3250 0.0980]; % Red-Orange
+        
+        prof = data.profile_avg(mask_theo);
+        ci_lo = data.ci_lower(mask_theo);
+        ci_up = data.ci_upper(mask_theo);
+        
+        fill(ax2, [r_t; flipud(r_t)], [ci_lo; flipud(ci_up)], ...
+                 col, 'FaceAlpha', 0.08, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+        plot(ax2, r_t, prof, '-.', 'LineWidth', 2.5, 'Color', col, ...
+             'DisplayName', 'Peeters ($R/L_n = 2$)');
+    end
+    
+    % Peeters R/Ln Calculated (Experimental ~ 6) - CROPPED
+    if isfield(variants, 'Peeters_Rln_calc')
+        data = variants.Peeters_Rln_calc.R0_profile;
+        col = [0.6350 0.0780 0.1840]; % Dark Red
+        
+        prof = data.profile_avg(mask_theo);
+        ci_lo = data.ci_lower(mask_theo);
+        ci_up = data.ci_upper(mask_theo);
+        
+        fill(ax2, [r_t; flipud(r_t)], [ci_lo; flipud(ci_up)], ...
+                 col, 'FaceAlpha', 0.08, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+        plot(ax2, r_t, prof, '--', 'LineWidth', 2.5, 'Color', col, ...
+             'DisplayName', sprintf('Peeters ($R/L_n \\approx %.1f$)', meta.R_over_Ln_mid));
+    end
+    
+    % Formatting
+    xlabel(ax2, 'Normalised Radius ($r/a$)', 'Interpreter', 'latex');
+    ylabel(ax2, 'Effective Diffusivity [m$^2$/s]', 'Interpreter', 'latex');
+    title(ax2, 'Peeters Model: Sensitivity to Density Gradient', 'Interpreter', 'latex');
+    
+    % Fixed Scale (0 to 25 as requested)
+    xlim(ax2, [0, 1]); ylim(ax2, [0, 25]);
+    
+    legend(ax2, 'Location', 'northwest', 'Interpreter', 'latex', 'Box', 'off');
+    set_publication_style(ax2);
+    
+    % Annotation Box
+    anno_text2 = { ...
+        '\bf{Framework:}', general_formula, ...
+        '\bf{Base Diffusivity:}', chi_solo_formula, ...
+        '\bf{Pinch Model (Peeters):}', ...
+        '$V_{\mathrm{pinch}} = (\chi_{\phi}/R) \cdot (-4 - R/L_n)$', ...
+        'Testing sensitivity to $R/L_n$ choice.'
+    };
+    annotation('textbox', [0.33, 0.65, 0.38, 0.25], 'String', anno_text2, ...
+        'Interpreter', 'latex', 'FontSize', 16, 'FitBoxToText', 'on', ...
+        'BackgroundColor', [1, 1, 1, 0.85], 'EdgeColor', 'k', 'VerticalAlignment', 'top');
+
+    saveas(fig2, fullfile(save_dir, 'final_comparison_peeters.png'));
+    savefig(fig2, fullfile(save_dir, 'final_comparison_peeters.fig'));
+    
+    fprintf('...consolidated plots saved.\n');
 end
