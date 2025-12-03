@@ -49,40 +49,37 @@ if ~exist(plots_dir, 'dir'), mkdir(plots_dir); end
 % -------------------------------------------------------------------------
 % 2. CONTROL PANEL
 % -------------------------------------------------------------------------
-% Set flags to 'true' to force re-computation of a specific stage.
-% Set to 'false' to attempt loading results from the .mat cache.
 
 run_flags = struct( ...
-    'setup_and_data',        false, ... % Stage 1
-    'profile_analyses',      false, ... % Stage 2
-    'physics_profiles',      false, ... % Stage 3
-    'theoretical_models',    false, ... % Stage 4
-    'neutral_and_collision', false, ... % Stage 5
-    'diffusivity_thesis',    false, ... % Stage 6
-    'diffusivity_scaling',   true, ... % Stage 7a
-    'build_variants',        true  ... % Stage 7b
+    'setup_and_data',        false, ... 
+    'profile_analyses',      false, ... 
+    'physics_profiles',      false,  ... % <--- ATTENTION: TRUE (to calculate Solomon's collisionality)
+    'theoretical_models',    true,  ... % <--- ATTENTION: TRUE (to  usar a nova colisionalidade)
+    'neutral_and_collision', true, ... 
+    'diffusivity_thesis',    true, ... 
+    'diffusivity_scaling',   true,  ... % <--- ATTENTION: TRUE (para propagar a nova física)
+    'build_variants',        true   ... % <--- ATTENTION: TRUE (para atualizar o benchmark)
 );
 
-% Set to 'true' to generate and save the corresponding figure sets.
 plot_flags = struct( ...
     'justification_and_fits',  true, ...
     'thesis_method_results',   true, ...
     'supporting_profiles',     true, ...
-    'final_comparison',        true, ...
-    'collisionality_comparison', true ...
+    'final_comparison',        true,  ... % Ato 1: Mostra os modelos (com a singularidade física)
+    'collisionality_comparison', true ... % Interlúdio: Wesson vs Solomon
 );
 
-% Set to 'true' to run time-consuming parameter scans.
 study_flags = struct( ...
-    'neutral_scan', false ... 
+    'neutral_scan', false, ...            % O antigo grid scan (desativado)
+    'advanced_inverse_analysis', false ... % Ato 2: Otimização Voigt e Inversão
 );
 
-stop_on_error = false; % If true, halts execution immediately upon any error.
+stop_on_error = true;
 
 fprintf('>>> Control panel configured.\n\n');
 
 % =========================================================================
-% 3. PIPELINE EXECUTION (Calculation Stages)
+% 3. PIPELINE EXECUTION
 % =========================================================================
 
 %% Stage 1: Setup & Data
@@ -186,11 +183,10 @@ fprintf('\n>>> All calculation stages executed (or loaded) successfully.\n\n');
 % =========================================================================
 % 4. PLOTTING SECTION
 % =========================================================================
-% Safe check for plot flags to avoid parser errors.
 p_cells = struct2cell(plot_flags);
-p_arr   = [p_cells{:}];
+p_vals = [p_cells{:}];
 
-if any(p_arr)
+if any(p_vals)
     fprintf('--- Generating selected plots ---\n');
     try
         if plot_flags.justification_and_fits
@@ -212,6 +208,7 @@ if any(p_arr)
                 constants, plots_dir);
         end
         
+        % INTERLÚDIO: Comparação de Colisionalidades
         if isfield(plot_flags, 'collisionality_comparison') && plot_flags.collisionality_comparison
              plot_collisionality_comparison(derived_profiles, constants, velocity_results, ...
                 effective_diffusivity_thesis, plots_dir);
@@ -219,7 +216,7 @@ if any(p_arr)
 
         fprintf('--- Plotting complete. Figures saved to %s ---\n', plots_dir);
     catch ME
-        warning(ME.identifier, 'Plotting phase failed: %s', ME.message);
+        warning('TCABR:PlottingError', 'Plotting phase failed: %s', ME.message);
         fprintf(2, 'Error occurred in file %s at line %d.\n', ME.stack(1).file, ME.stack(1).line);
     end
 end
@@ -228,19 +225,29 @@ end
 % 5. STUDY SECTION (Optional)
 % =========================================================================
 s_cells = struct2cell(study_flags);
-s_arr   = [s_cells{:}];
+s_vals = [s_cells{:}];
 
-if any(s_arr)
+if any(s_vals)
     fprintf('\n--- Running selected studies ---\n');
     
-    if study_flags.neutral_scan
+    % Study 1: Old Grid Scan (Mantido para legado, se necessário)
+    if isfield(study_flags, 'neutral_scan') && study_flags.neutral_scan
         try
-            % Pass results_dir so plots can be saved correctly
             run_scan_neutrals_fit(velocity_results, temperature_results, theoretical_variants, ...
                 constants, r_fine, results_dir);
         catch ME
-            warning(ME.identifier, 'Neutral scan study failed: %s', ME.message);
-            fprintf(2, 'Error occurred in file %s at line %d.\n', ME.stack(1).file, ME.stack(1).line);
+            warning('TCABR:StudyError', 'Neutral scan study failed: %s', ME.message);
+        end
+    end
+
+    % Study 2: ATO 2 - Advanced Inverse Analysis (Voigt Optimization)
+    if isfield(study_flags, 'advanced_inverse_analysis') && study_flags.advanced_inverse_analysis
+        try
+            run_advanced_fit(velocity_results, collision_profiles, theoretical_variants, ...
+                constants, r_fine, results_dir);
+        catch ME
+             warning('TCABR:StudyError', 'Advanced fit study failed: %s', ME.message);
+             fprintf(2, 'Error occurred in file %s at line %d.\n', ME.stack(1).file, ME.stack(1).line);
         end
     end
 end

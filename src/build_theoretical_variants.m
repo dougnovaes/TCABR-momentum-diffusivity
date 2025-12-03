@@ -1,18 +1,31 @@
 function [variants] = build_theoretical_variants(velocity_results, derived_profiles, constants, r_fine)
-%BUILD_THEORETICAL_VARIANTS Systematically computes theoretical chi_phi_eff variants.
-%   This function implements the "Hybrid Approach" for theoretical benchmarking:
-%   1.  MAGNITUDE: Uses GLOBAL representative parameters (<Te>, <ne>, nu*_global)
-%       to calculate the baseline turbulent diffusivity (chi_phi) and pinch velocity
-%       (V_pinch). This avoids non-physical "explosions" at the cold edge.
-%   2.  SHAPE: Uses the LOCAL experimental velocity gradient (R/L_Vphi) to 
-%       calculate the effective diffusivity (chi_eff), preserving physical 
-%       singularities where shear vanishes.
+%BUILD_THEORETICAL_VARIANTS Computes theoretical transport variants using a Hybrid Approach.
 %
-%   It performs a Monte Carlo propagation (n_iter) to quantify uncertainties
-%   in the empirical coefficients (Solomon 2010).
+%   PURPOSE:
+%       Generates Monte Carlo uncertainty bands for theoretical momentum diffusivity (chi_phi)
+%       and effective diffusivity (chi_eff) profiles.
 %
-%   Syntax:
-%       variants = build_theoretical_variants(velocity_results, derived_profiles, constants, r_fine)
+%   METHODOLOGY (HYBRID GLOBAL/LOCAL):
+%       This function bridges the gap between multi-machine scalings and local transport physics:
+%       1. MAGNITUDE (Global): Uses the Global Solomon Collisionality (nu*_global) calculated
+%          from volume-averaged parameters to set the baseline level of turbulent diffusivity.
+%          This prevents unphysical divergences at the cold plasma edge.
+%       2. SHAPE (Local): Uses the LOCAL experimental velocity gradient (R/L_Vphi) to 
+%          modulate the effective diffusivity via the Pinch term. This preserves the 
+%          physical topology of the transport, including singularities where shear vanishes.
+%
+%   INPUTS:
+%       velocity_results : Struct with fitted V_phi and uncertainties.
+%       derived_profiles : Struct with collisionality and density gradients.
+%       constants        : Project constants.
+%       r_fine           : Radial grid.
+%
+%   OUTPUTS:
+%       variants         : Struct containing mean and CI profiles for:
+%                          - Solomon (Base)
+%                          - Hahm (TEP)
+%                          - Gürcan (TEP + Density)
+%                          - Peeters (Coriolis)
 
     arguments
         velocity_results (1,1) struct
@@ -30,57 +43,57 @@ function [variants] = build_theoretical_variants(velocity_results, derived_profi
     a  = constants.machine.a;
     R0 = constants.machine.R0;
     r_norm = r_fine / a;
-    R_coord = R0 * (1 + r_fine / R0); % Local Major Radius R(r)
-    safe_mask = (r_norm >= 0.2) & (r_norm <= 0.9);
+    R_coord = R0 * (1 + r_fine / R0); 
 
     % =========================================================================
-    % 2. LOCAL GEOMETRIC GRADIENTS (THE "SHAPE")
+    % 2. LOCAL GRADIENTS (THE "SHAPE")
     % =========================================================================
     % Velocity Gradient (from polynomial fit)
     v_phi = velocity_results.poly_fit_avg; 
     grad_Vphi = gradient(v_phi, r_fine);
     v_safe = v_phi; 
-    v_safe(abs(v_safe) < 1e-9) = 1e-9; % Guard against division by zero
+    v_safe(abs(v_safe) < 1e-9) = 1e-9; 
     
-    % Profile of R/L_Vphi (Local inverse gradient scale length)
+    % Profile of R/L_Vphi
     R_over_LVphi_profile = -R0 ./ v_safe .* grad_Vphi;
-
-    % Mid-radius reference values for constant approximations
+    
     [~, idx_mid] = min(abs(r_fine - a * 0.5));
     R_over_LVphi_mid = R_over_LVphi_profile(idx_mid);
 
-    % R/L_n: Use fixed mid-radius value to stabilize Peeters/Solomon base magnitude
+    % R/L_n: Use fixed mid-radius value for stability
     if isfield(derived_profiles, 'R_over_Ln')
         R_over_Ln_mid = derived_profiles.R_over_Ln(idx_mid);
+        R_over_Ln_profile = derived_profiles.R_over_Ln;
     else
         R_over_Ln_mid = derived_profiles.gradients.R_over_Ln(idx_mid);
+        R_over_Ln_profile = derived_profiles.gradients.R_over_Ln;
     end
     
     % =========================================================================
     % 3. GLOBAL PHYSICS PARAMETERS (THE "MAGNITUDE")
     % =========================================================================
-    % Retrieve the Global Solomon Collisionality calculated in Step 1
-    % This represents the discharge regime (e.g., Plateau vs Pfirsch-Schlüter)
     if isfield(derived_profiles, 'global_params') && isfield(derived_profiles.global_params, 'nu_star_e_solomon')
         nu_star_global = derived_profiles.global_params.nu_star_e_solomon;
-        fprintf('   Using Global Solomon Collisionality: %.4f\n', nu_star_global);
-    else
-        % Fallback if structure differs (e.g., older cache)
-        warning('Global Solomon collisionality not found. Using mid-radius local value as fallback.');
-        if isfield(derived_profiles, 'nu_star_e_solomon')
-            nu_star_global = derived_profiles.nu_star_e_solomon(idx_mid);
-        else
-             nu_star_global = derived_profiles.nu_star_e(idx_mid);
+        fprintf('   -> Using Global Solomon Collisionality: %.4f\n', nu_star_global);
+        
+        % Range Check
+        if nu_star_global > 0.8
+             warning('TCABR:Physics', ...
+                ['Global Collisionality (%.2f) exceeds Solomon''s range (0.8). ' ...
+                 'Theoretical diffusivity is an EXTRAPOLATION.'], nu_star_global);
         end
+    else
+        warning('Global collisionality not found. Using mid-radius fallback.');
+        nu_star_global = derived_profiles.nu_star_e_solomon(idx_mid);
     end
 
     % =========================================================================
     % 4. MONTE CARLO SETUP
     % =========================================================================
-    % Gürcan Asymmetry Factor (Exposed for tuning)
-    F_gurcan = 0.5; % 0.5 = Mixed, 1.0 = Ballooning.
+    F_gurcan = 1.0; 
+    F_hahm   = 1.0;
 
-    % Solomon Coefficients (2010) with uncertainties
+    % Solomon Coefficients (2010)
     A = 6.09;  A_err = 0.72;
     B = 0.157; B_err = 0.072;
     C = -24.2; C_err = 3.5;
@@ -88,86 +101,65 @@ function [variants] = build_theoretical_variants(velocity_results, derived_profi
     n_iter = 1000;
     fprintf('...running %d iterations...\n', n_iter);
     
-    % Pre-sample coefficients (Normal distribution)
     A_s = A + A_err * randn(n_iter, 1);
     B_s = B + B_err * randn(n_iter, 1);
     C_s = C + C_err * randn(n_iter, 1);
 
-    % Storage for Base Diffusivity Statistics
     chi_base_storage = zeros(n_iter, 1); 
 
-    % Pre-allocate storage for profiles
     models = {'Solomon', 'Hahm', 'Gurcan', 'Peeters_Rln2', 'Peeters_Rln_calc'};
     storage = struct();
     for m = 1:numel(models)
         name = models{m};
-        storage.(name).R0_profile = zeros(n_iter, numel(r_fine));  % Main variant (Global Base + Local Shape)
-        storage.(name).R0_mid     = zeros(n_iter, numel(r_fine));  % Constant reference
-        storage.(name).Rlocal_mid = zeros(n_iter, numel(r_fine));
-        storage.(name).Rlocal_profile = zeros(n_iter, numel(r_fine));
+        storage.(name).R0_profile = zeros(n_iter, numel(r_fine));
+        storage.(name).R0_mid     = zeros(n_iter, numel(r_fine));
     end
 
     % =========================================================================
     % 5. CALCULATION LOOP
     % =========================================================================
     for i = 1:n_iter
-        % --- A. Calculate SCALAR Base Diffusivity (Global Regime) ---
-        % Formula: chi = A * nu_global + B * R/Ln_mid
-        % This gives a stable "floor" for the diffusivity (~2-5 m^2/s)
+        % A. Base Diffusivity (Scalar)
         chi_base = A_s(i) * nu_star_global + B_s(i) * R_over_Ln_mid;
-        
-        % Store for CI calculation later
         chi_base_storage(i) = chi_base;
 
-        % --- B. Calculate SCALAR Pinch Velocities (Global Regime) ---
-        % Solomon: depends only on nu*
+        % B. Pinch Velocities
         vp_solo = C_s(i) * nu_star_global;
-
-        % Prepare Pinch Velocity Struct (Scalar values, except Gürcan geometric factor)
+        
         vp = struct();
         vp.Solomon = vp_solo;
-        vp.Hahm    = -2 * chi_base / R0;
+        vp.Hahm    = -2 * chi_base / R0 * F_hahm;
         
-        % Gürcan: -(2*Chi/R) * (F + r/R0). 
-        % The base magnitude is global, but the geometric factor (r/R0) is local.
-        vp.Gurcan  = -(2 * chi_base ./ R_coord') .* (F_gurcan + r_fine'/R0);
+        % Gürcan: V = (chi/R) * [ -2(F + r/R) + R/Ln ]
+        term_geometric = -2 * (F_gurcan + r_fine'/R0);
+        term_density   = R_over_Ln_profile'; 
+        vp.Gurcan      = (chi_base ./ R_coord') .* (term_geometric + term_density);
         
-        % Peeters: (Chi/R) * (-4 - R/Ln)
-        % We use FIXED R/Ln to avoid edge noise in the pinch term magnitude
-        vp.Peeters_Rln2     = (chi_base / R0) * (-6);             % Fixed R/Ln=2 -> (-4-2) = -6
-        vp.Peeters_Rln_calc = (chi_base / R0) * (-4 - R_over_Ln_mid); % Mid R/Ln
+        % Peeters
+        vp.Peeters_Rln2     = (chi_base / R0) * (-4 - 2);
+        vp.Peeters_Rln_calc = (chi_base / R0) * (-4 - R_over_Ln_mid); 
 
-        % --- C. Calculate Effective Diffusivity Profiles ---
-        % Formula: Chi_eff(r) = Chi_base * (1 + PinchNumber(r) / R_over_LVphi(r))
-        
+        % C. Effective Diffusivity
         for m = 1:numel(models)
             name = models{m};
             
-            % Extract Pinch Velocity (Scalar or Vector)
             if strcmp(name, 'Gurcan')
-                v_pinch = vp.Gurcan; % Vector
+                v_pinch = vp.Gurcan; 
                 PinchNum_R0 = (R0 * v_pinch) ./ chi_base;
-                PinchNum_Rloc = (R_coord' .* v_pinch) ./ chi_base;
             else
-                v_val = vp.(name); % Scalar
+                v_val = vp.(name); 
                 PinchNum_R0 = (R0 * v_val) / chi_base;
-                PinchNum_Rloc = (R_coord' * v_val) / chi_base;
             end
-
-            % Variant 1: R0, Profile Grads (THE HYBRID MODEL - Preferred)
+            
+            % Hybrid Variant
             storage.(name).R0_profile(i,:) = chi_base .* (1 + PinchNum_R0 ./ R_over_LVphi_profile');
-
-            % Variant 2: R0, Mid Grads (Constant Reference)
-            storage.(name).R0_mid(i,:) = chi_base .* (1 + PinchNum_R0 ./ R_over_LVphi_mid);
-
-            % Variant 3/4: Local R (Secondary checks)
-            storage.(name).Rlocal_profile(i,:) = chi_base .* (1 + PinchNum_Rloc ./ R_over_LVphi_profile');
-            storage.(name).Rlocal_mid(i,:) = chi_base .* (1 + PinchNum_Rloc ./ R_over_LVphi_mid);
+            % Constant Reference Variant
+            storage.(name).R0_mid(i,:)     = chi_base .* (1 + PinchNum_R0 ./ R_over_LVphi_mid);
         end
     end
     
     % =========================================================================
-    % 6. PACKAGE STATISTICS
+    % 6. PACKAGE RESULTS
     % =========================================================================
     variants = struct();
     for i = 1:numel(models)
@@ -183,16 +175,16 @@ function [variants] = build_theoretical_variants(velocity_results, derived_profi
         end
     end
     
-    % --- Metadata & Base Diffusivity Statistics ---
+    % Metadata
     variants.meta.r_fine = r_fine;
     variants.meta.r_norm = r_norm;
-    variants.meta.safe_mask = safe_mask;
+    % Define mask here, close to where it's stored
+    variants.meta.safe_mask = (r_norm >= 0.2) & (r_norm <= 0.9); 
     variants.meta.R_over_LVphi_profile = R_over_LVphi_profile;
     variants.meta.R_over_LVphi_mid = R_over_LVphi_mid;
     variants.meta.R_over_Ln_mid = R_over_Ln_mid;
     
-    % Store Base Diffusivity (Mean and CI) for plotting
-    % Since chi_base is scalar per iteration, we expand to vector for plotting compatibility
+    % Base Statistics
     chi_base_mean = mean(chi_base_storage);
     chi_base_ci   = prctile(chi_base_storage, [2.5, 97.5]);
     

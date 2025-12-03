@@ -14,8 +14,8 @@ function run_scan_neutrals_fit(velocity_results, temperature_results, theoretica
     fprintf('--- Configuring neutral density parameter scan ---\n');
 
     % --- 1. Define Parameter Ranges for the Scan ---
-    amps = linspace(1.5e16, 3.0e16, 10);  % Amplitude of Gaussian peak [m^-3]
-    widths = linspace(0.020, 0.030, 10); % Gaussian width (penetration depth) [m]
+    amps = linspace(2.0e16, 3.5e16, 10);  % Amplitude of Gaussian peak [m^-3]
+    widths = linspace(0.025, 0.040, 15); % Gaussian width (penetration depth) [m]
     r0s = linspace(0.160, 0.165, 5);      % Radial position of peak [m]
     
     % --- 2. Configure Scan Options ---

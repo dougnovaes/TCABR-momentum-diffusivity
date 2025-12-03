@@ -22,7 +22,7 @@ function plot_stage1_justification_and_fits(constants, exp_data, velocity_result
         'MarkerSize', 8, 'LineWidth', 1.5, 'DisplayName', 'Experimental Data');
     plot(ax1, r_norm, temperature_results.profile_avg, 'r-', 'LineWidth', 4, 'DisplayName', 'Canonical fit');
     fill(ax1, [r_norm; flipud(r_norm)], [temperature_results.profile_ci_lower; flipud(temperature_results.profile_ci_upper)], ...
-        'r', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', '95% Confidence Band');
+        'r', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', '95\% Confidence Band');
     xlabel(ax1, 'Normalised Radius ($r/a$)', 'Interpreter', 'latex');
     ylabel(ax1, 'Ion Temperature, $T_{i}$ (eV)', 'Interpreter', 'latex');
     title(ax1, 'Ion Temperature Profile Analysis', 'Interpreter', 'latex');
@@ -37,7 +37,7 @@ function plot_stage1_justification_and_fits(constants, exp_data, velocity_result
         exp_data.Vphi_err_exp, 'ko', 'MarkerFaceColor', 'k', 'MarkerSize', 8, ...
         'LineWidth', 1.5, 'DisplayName', 'Experimental data');
     h2 = fill(ax2, [r_norm; flipud(r_norm)], [-velocity_results.poly_fit_ci_upper / 1000; -flipud(velocity_results.poly_fit_ci_lower / 1000)], ...
-        'g', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', '95% Confidence interval');
+        'g', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', '95\% Confidence interval');
     h3 = plot(ax2, r_norm, -velocity_results.poly_fit_avg / 1000, 'g--', 'LineWidth', 5, 'DisplayName', '5th-order polynomial fit');
     
     % CORRECTION: Use flattened field name
@@ -59,7 +59,7 @@ function plot_stage1_justification_and_fits(constants, exp_data, velocity_result
         exp_data.Vphi_err_exp, 'ko', 'MarkerFaceColor', 'k', 'MarkerSize', 8, 'LineWidth', 1.5, 'DisplayName', 'Experimental Data');
     plot(ax3, r_norm, -velocity_results.poly_fit_avg / 1000, 'g--', 'LineWidth', 6, 'DisplayName', '5th-order polynomial fit');
     fill(ax3, [r_norm; flipud(r_norm)], [-velocity_results.poly_fit_ci_lower / 1000; flipud(-velocity_results.poly_fit_ci_upper / 1000)], ...
-        'g', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', '95% Confidence interval');
+        'g', 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', '95\% Confidence interval');
     plot(ax3, r_norm, -velocity_results.bessel_fit / 1000, 'r-', 'LineWidth', 4, 'DisplayName', 'Fourier-Bessel series fit');
     yline(ax3, 0, '--', 'HandleVisibility', 'off');
     xlabel(ax3, 'Normalised Radius ($r/a$)', 'Interpreter', 'latex'); 

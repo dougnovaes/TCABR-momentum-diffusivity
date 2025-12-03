@@ -31,7 +31,7 @@ function plot_stage2_thesis_method(constants, neutral_profile, collision_profile
     grid(ax1_left, 'on');
     xlabel(ax1_left, 'Normalised Radius ($r/a$)'); ylabel(ax1_left, '$n_{H0}$ ($\times10^{16}$ m$^{-3}$)');
     title(ax1_left, 'Neutral Density Profile');
-    xlim(ax1_left, [0, 1]); ylim(ax1_left, [0, 3]); 
+    xlim(ax1_left, [0, 1]); ylim(ax1_left, [0, 6]); 
     legend(ax1_left, 'show', 'Location', 'southeast');
     set_publication_style(ax1_left); hold(ax1_left, 'off');
 
