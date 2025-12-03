@@ -73,8 +73,9 @@ function [derived_profiles] = compute_derived_profiles(exp_data, ...
     fprintf('... calculating safety factor and magnetic shear\n');
     q_and_shear = struct();
     
-    B_pol_safe = B_pol + 1e-9; 
-    fq = exp(0.21303 .* r_fine ./ a); 
+    delta = 0.00008; % added to BPol values to avoid the division by ~zero.
+    B_pol_safe = B_pol + delta; 
+    fq = exp(0.21303 .* r_fine ./ a); % fix factor by Severo & Novaes (08/07/2024)
     
     q_profile = (r_fine ./ R0) .* (B_tor ./ B_pol_safe) ./ sqrt(1 - (r_fine ./ R0).^2) .* fq;
     q_profile(1) = q_profile(2); 

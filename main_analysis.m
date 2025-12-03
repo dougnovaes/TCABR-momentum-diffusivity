@@ -7,25 +7,22 @@
 %   modular execution, per-stage caching, and controlled plotting.
 %
 % DESIGN:
-%   - Modular "stage" system: results saved to /results as .mat per stage.
-%   - Clear separation between computation, visualisation, and studies.
-%   - Interruptible pipeline via 'run_flags' and 'plot_flags'.
+%   - Modular "stage" system: Results are saved to 'results/' as .mat files.
+%   - Focus: Calculation of effective diffusivity and comparison with 
+%     theoretical benchmarks (Solomon, Hahm, Gürcan, Peeters).
+%   - No inverse fitting or parameter scanning is performed in this version.
 %
 % LAYOUT:
 %   Root/
 %     ├── main_analysis.m    # This script
-%     ├── data/              # Input data files (e.g., .txt)
-%     ├── src/               # Core computational routines (physics & analysis)
-%     ├── utils/             # Utility functions and wrappers
-%     ├── plotting/          # Publication-quality visualisation scripts
-%     ├── studies/           # High-level parameter scans or specialised analyses
-%     └── results/           # Per-stage .mat results and generated plots
+%     ├── data/              # Input data files (experimental_profiles.txt)
+%     ├── src/               # Core computational routines
+%     ├── utils/             # Utility functions (cache, math)
+%     ├── plotting/          # Publication-quality visualisation
+%     └── results/           # Output .mat files and figures
 %
 % REQUIREMENTS:
-%   MATLAB R2025b or newer
-%   - Curve Fitting Toolbox
-%   - Parallel Computing Toolbox
-%   - Statistics and Machine Learning Toolbox
+%   MATLAB R2025b or newer (Toolboxes: Curve Fitting, Parallel Computing)
 % =========================================================================
 
 clc; clear; close all;
@@ -37,8 +34,8 @@ fprintf('>>> Initiating TCABR modular momentum analysis pipeline...\n\n');
 [base_dir, ~, ~] = fileparts(mfilename('fullpath'));
 addpath(fullfile(base_dir, 'src'), ...
         fullfile(base_dir, 'plotting'), ...
-        fullfile(base_dir, 'utils'), ...
-        fullfile(base_dir, 'studies'));
+        fullfile(base_dir, 'utils'));
+        % Note: 'studies' folder removed from path as it is no longer used.
 
 results_dir = fullfile(base_dir, 'results');
 if ~exist(results_dir, 'dir'), mkdir(results_dir); end
@@ -49,29 +46,28 @@ if ~exist(plots_dir, 'dir'), mkdir(plots_dir); end
 % -------------------------------------------------------------------------
 % 2. CONTROL PANEL
 % -------------------------------------------------------------------------
+% CONFIGURATION:
+% - Set flags to 'true' to force re-computation.
+% - Set to 'false' to load from cache (if available).
 
 run_flags = struct( ...
-    'setup_and_data',        false, ... 
-    'profile_analyses',      false, ... 
-    'physics_profiles',      true,  ... % <--- ATTENTION: TRUE (to calculate Solomon's collisionality)
-    'theoretical_models',    true,  ... % <--- ATTENTION: TRUE (to  usar a nova colisionalidade)
-    'neutral_and_collision', true, ... 
-    'diffusivity_thesis',    true, ... 
-    'diffusivity_scaling',   true,  ... % <--- ATTENTION: TRUE (para propagar a nova física)
-    'build_variants',        true   ... % <--- ATTENTION: TRUE (para atualizar o benchmark)
+    'setup_and_data',        true, ... % Stage 1: Load constants & raw data
+    'profile_analyses',      true, ... % Stage 2: Fit Vphi/Ti (Bootstrap)
+    'physics_profiles',      true, ... % Stage 3: Calc Collisionality (Solomon Global), q, s
+    'theoretical_models',    true, ... % Stage 4: Calc Theoretical Profiles (Helander/Solomon)
+    'neutral_and_collision', true, ... % Stage 5: Calc Neutral Density & Freqs
+    'diffusivity_thesis',    true, ... % Stage 6: Calc Exp. Chi_eff (Thesis Method)
+    'diffusivity_scaling',   true, ... % Stage 7a: Calc Theory Chi (Base Scaling)
+    'build_variants',        true   ... % Stage 7b: Calc Theory Variants (Global Magnitude/Local Shape)
 );
 
+% PLOTTING CONFIGURATION:
 plot_flags = struct( ...
-    'justification_and_fits',  true, ...
-    'thesis_method_results',   true, ...
-    'supporting_profiles',     true, ...
-    'final_comparison',        true,  ... % Ato 1: Mostra os modelos (com a singularidade física)
-    'collisionality_comparison', true ... % Interlúdio: Wesson vs Solomon
-);
-
-study_flags = struct( ...
-    'neutral_scan', false, ...            % O antigo grid scan (desativado)
-    'advanced_inverse_analysis', false ... % Ato 2: Otimização Voigt e Inversão
+    'justification_and_fits',  true, ... % Stage 1 Plots
+    'thesis_method_results',   true, ... % Stage 2 Plots
+    'supporting_profiles',     true, ... % Stage 3 Plots
+    'final_comparison',        true,  ... % Stage 4: Final Comparison (Fixed Scale 0-25)
+    'collisionality_comparison', true ... % Analysis: Wesson vs Solomon
 );
 
 stop_on_error = true;
@@ -79,7 +75,7 @@ stop_on_error = true;
 fprintf('>>> Control panel configured.\n\n');
 
 % =========================================================================
-% 3. PIPELINE EXECUTION
+% 3. PIPELINE EXECUTION (Calculations)
 % =========================================================================
 
 %% Stage 1: Setup & Data
@@ -89,7 +85,7 @@ try
         run_flags.setup_and_data, ...
         @stage1_setup_and_data, ...
         {'constants','exp_data','r_fine'});
-    fprintf('[✓] Stage 1 completed: setup & data.\n');
+    fprintf('[✓] Stage 1 completed: Setup & Data.\n');
 catch ME
     handle_stage_error(ME, 1, stop_on_error);
 end
@@ -101,7 +97,7 @@ try
         run_flags.profile_analyses, ...
         @() stage2_profiles(exp_data, constants, r_fine), ...
         {'velocity_results','temperature_results'});
-    fprintf('[✓] Stage 2 completed: profile analyses.\n');
+    fprintf('[✓] Stage 2 completed: Profile Analyses.\n');
 catch ME
     handle_stage_error(ME, 2, stop_on_error);
 end
@@ -113,7 +109,7 @@ try
         run_flags.physics_profiles, ...
         @() stage3_physics(exp_data, temperature_results, constants, r_fine), ...
         {'magnetic_field','derived_profiles'});
-    fprintf('[✓] Stage 3 completed: physics profiles.\n');
+    fprintf('[✓] Stage 3 completed: Physics Profiles.\n');
 catch ME
     handle_stage_error(ME, 3, stop_on_error);
 end
@@ -125,7 +121,7 @@ try
         run_flags.theoretical_models, ...
         @() stage4_models(temperature_results, magnetic_field, derived_profiles, constants), ...
         {'theoretical_models'});
-    fprintf('[✓] Stage 4 completed: theoretical models.\n');
+    fprintf('[✓] Stage 4 completed: Theoretical Models.\n');
 catch ME
     handle_stage_error(ME, 4, stop_on_error);
 end
@@ -137,7 +133,7 @@ try
         run_flags.neutral_and_collision, ...
         @() stage5_neutral_collision(r_fine, temperature_results, constants), ...
         {'neutral_profile','collision_profiles'});
-    fprintf('[✓] Stage 5 completed: neutrals & collisions.\n');
+    fprintf('[✓] Stage 5 completed: Neutrals & Collisions.\n');
 catch ME
     handle_stage_error(ME, 5, stop_on_error);
 end
@@ -149,7 +145,7 @@ try
         run_flags.diffusivity_thesis, ...
         @() stage6_diffusivity_thesis(velocity_results, collision_profiles, r_fine), ...
         {'effective_diffusivity_thesis'});
-    fprintf('[✓] Stage 6 completed: effective diffusivity (thesis method).\n');
+    fprintf('[✓] Stage 6 completed: Exp. Effective Diffusivity.\n');
 catch ME
     handle_stage_error(ME, 6, stop_on_error);
 end
@@ -161,19 +157,20 @@ try
         run_flags.diffusivity_scaling, ...
         @() stage7a_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine), ...
         {'scaling_law_results'});
-    fprintf('[✓] Stage 7a completed: effective diffusivity (base scaling laws).\n');
+    fprintf('[✓] Stage 7a completed: Theor. Diffusivity (Base).\n');
 catch ME
     handle_stage_error(ME, 7, stop_on_error);
 end
 
 %% Stage 7b: Build Theoretical Variants
+% This stage calls the external function 'src/build_theoretical_variants.m'
 try
     theoretical_variants = load_or_compute( ...
         fullfile(results_dir, 'stage7b_theoretical_variants.mat'), ...
         run_flags.build_variants, ...
         @() build_theoretical_variants(velocity_results, derived_profiles, constants, r_fine), ...
         {'theoretical_variants'});
-    fprintf('[✓] Stage 7b completed: theoretical chi_eff variants built.\n');
+    fprintf('[✓] Stage 7b completed: Theor. Variants Built.\n');
 catch ME
     handle_stage_error(ME, 7.5, stop_on_error);
 end
@@ -208,7 +205,6 @@ if any(p_vals)
                 constants, plots_dir);
         end
         
-        % INTERLÚDIO: Comparação de Colisionalidades
         if isfield(plot_flags, 'collisionality_comparison') && plot_flags.collisionality_comparison
              plot_collisionality_comparison(derived_profiles, constants, velocity_results, ...
                 effective_diffusivity_thesis, plots_dir);
@@ -218,37 +214,6 @@ if any(p_vals)
     catch ME
         warning('TCABR:PlottingError', 'Plotting phase failed: %s', ME.message);
         fprintf(2, 'Error occurred in file %s at line %d.\n', ME.stack(1).file, ME.stack(1).line);
-    end
-end
-
-% =========================================================================
-% 5. STUDY SECTION (Optional)
-% =========================================================================
-s_cells = struct2cell(study_flags);
-s_vals = [s_cells{:}];
-
-if any(s_vals)
-    fprintf('\n--- Running selected studies ---\n');
-    
-    % Study 1: Old Grid Scan (Mantido para legado, se necessário)
-    if isfield(study_flags, 'neutral_scan') && study_flags.neutral_scan
-        try
-            run_scan_neutrals_fit(velocity_results, temperature_results, theoretical_variants, ...
-                constants, r_fine, results_dir);
-        catch ME
-            warning('TCABR:StudyError', 'Neutral scan study failed: %s', ME.message);
-        end
-    end
-
-    % Study 2: ATO 2 - Advanced Inverse Analysis (Voigt Optimization)
-    if isfield(study_flags, 'advanced_inverse_analysis') && study_flags.advanced_inverse_analysis
-        try
-            run_advanced_fit(velocity_results, collision_profiles, theoretical_variants, ...
-                constants, r_fine, results_dir);
-        catch ME
-             warning('TCABR:StudyError', 'Advanced fit study failed: %s', ME.message);
-             fprintf(2, 'Error occurred in file %s at line %d.\n', ME.stack(1).file, ME.stack(1).line);
-        end
     end
 end
 
@@ -289,5 +254,8 @@ function effective_diffusivity_thesis = stage6_diffusivity_thesis(velocity_resul
 end
 
 function scaling_law_results = stage7a_diffusivity_scaling(velocity_results, derived_profiles, constants, r_fine)
-    scaling_law_results = compute_chi_eff_from_scalings_base(velocity_results, derived_profiles, constants, r_fine);
+    scaling_law_results = compute_chi_eff_from_scalings(velocity_results, derived_profiles, constants, r_fine);
 end
+
+% NOTE: build_theoretical_variants wrapper removed to avoid infinite recursion.
+% The main script calls the function from 'src/' directly.
