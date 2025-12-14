@@ -110,36 +110,105 @@ function [derived_profiles] = compute_derived_profiles(exp_data, ...
     omega_De = 2 * sqrt(0.1) .* c_s ./ R_coord;
     collisionality.nu_star_e_solomon_local = collisions.nu_ei_15 ./ omega_De;
 
-    % --- 6. GLOBAL PARAMETERS (Maslov Definition) ---
-    fprintf('... calculating global parameters (Maslov Criterion)\n');
+    % =========================================================================
+    % 6. GLOBAL PARAMETERS (MASLOV/SOLOMON DEFINITION)
+    % =========================================================================
+    fprintf('... calculating global parameters (Restricted Volume Average)\n');
     
-    % A. Volume Averages
-    integrate_vol = @(y) trapz(r_fine, y .* r_fine);
-    vol_norm = integrate_vol(ones(size(r_fine)));
-    Te_vol_avg = integrate_vol(Te_mean) / vol_norm;
-    ne_vol_avg = integrate_vol(ne_fine) / vol_norm;
+    r_norm = r_fine / a;
     
-    % B. Global Collisionality
+    % A. Define Integration Region (Confinement Zone)
+    % Rationale: To characterize the global thermodynamic regime relevant for 
+    % transport scaling, we calculate averages over the confinement zone
+    % (0.2 <= r/a <= 0.8). This avoids:
+    %   1. Core sawteeth/MHD activity (r/a < 0.2)
+    %   2. Edge noise and low-density/cold plasma (r/a > 0.8) which would
+    %      artificially lower the averages and inflate collisionality.
+    mask_zone = (r_norm >= 0.2) & (r_norm <= 0.8); 
+    
+    % Extract arrays for integration
+    r_zone  = r_fine(mask_zone);
+    Te_zone = Te_mean(mask_zone);
+    ne_zone = ne_fine(mask_zone);
+    
+    % B. Calculate Zonal Volume Averages
+    % Formula: <Y> = Integral(Y * r dr) / Integral(r dr)
+    % The weighting factor 'r' accounts for the cylindrical volume element dV.
+    integrate_zone = @(y) trapz(r_zone, y .* r_zone);
+    vol_norm_zone  = integrate_zone(ones(size(r_zone)));
+    
+    Te_vol_avg = integrate_zone(Te_zone) / vol_norm_zone;
+    ne_vol_avg = integrate_zone(ne_zone) / vol_norm_zone;
+    
+    % C. Global Collisionality (Maslov Definition)
+    % Uses the zonal averages calculated above.
+    % Formula: nu_eff = 1e-14 * Zeff * R * <ne> / <Te>^2
     nu_star_global_maslov = 1e-14 * Zeff * R0 * ne_vol_avg / (Te_vol_avg^2);
     
-    % C. Global Density Gradient (Linear Fit 0.2-0.8)
-    r_norm = r_fine / a;
-    mask_fit = (r_norm >= 0.2) & (r_norm <= 0.8);
-    if sum(mask_fit) > 5
-        % ln(n) = - (1/Ln)*r + C  => Slope P(1) = -1/Ln
-        P = polyfit(r_fine(mask_fit), log(ne_fine(mask_fit)), 1);
+    % D. Global Density Gradient (Maslov Linear Fit)
+    % Maslov (2009) defines the characteristic R/Ln as the slope of ln(ne)
+    % fitted over the range 0.2 - 0.8.
+    mask_grad = (r_norm >= 0.2) & (r_norm <= 0.8);
+    
+    if sum(mask_grad) > 5
+        % Linear fit: ln(n) = - (1/Ln)*r + C  => Slope P(1) = -1/Ln
+        P = polyfit(r_fine(mask_grad), log(ne_fine(mask_grad)), 1);
         Ln_inv_maslov = -P(1);
         R_over_Ln_maslov = R0 * Ln_inv_maslov;
     else
-        warning('Not enough points for Maslov R/Ln fit. Using local mid value.');
+        warning('TCABR:Physics', 'Not enough points for Maslov R/Ln fit. Using mid-radius local gradient.');
         [~, idx_mid] = min(abs(r_fine - a*0.5));
         R_over_Ln_maslov = R0 * (-gradient(log(ne_fine), r_fine));
         R_over_Ln_maslov = R_over_Ln_maslov(idx_mid);
     end
     
-    fprintf('      <Te>: %.2f eV, <ne>: %.2e m^-3\n', Te_vol_avg, ne_vol_avg);
-    fprintf('      Global nu*: %.4f\n', nu_star_global_maslov);
+    % --- Logging & Storage ---
+    fprintf('      Zone (0.2-0.8): <Te>=%.2f eV, <ne>=%.2e m^-3\n', Te_vol_avg, ne_vol_avg);
+    fprintf('      Global nu* (Maslov): %.4f\n', nu_star_global_maslov);
     fprintf('      Global R/Ln (Maslov): %.4f\n', R_over_Ln_maslov);
+
+    % Store Global Params in output structure
+    collisionality.global.Te_avg = Te_vol_avg;
+    collisionality.global.ne_avg = ne_vol_avg;
+    collisionality.global.nu_star_e_solomon = nu_star_global_maslov;
+
+    % Store Global Params
+    collisionality.global.Te_avg = Te_vol_avg;
+    collisionality.global.ne_avg = ne_vol_avg;
+    collisionality.global.nu_star_e_solomon = nu_star_global_maslov;
+
+    % % --- 6. GLOBAL PARAMETERS (Maslov Definition) ---
+    % fprintf('... calculating global parameters (Maslov Criterion)\n');
+    % 
+    % % A. Volume Averages (Integral de 0 a a)
+    % % The weighting "r" in the integral (y .* r_fine) causes the outer 
+    % % volume to have much more weight than the core.
+    % integrate_vol = @(y) trapz(r_fine, y .* r_fine);
+    % vol_norm = integrate_vol(ones(size(r_fine)));
+    % Te_vol_avg = integrate_vol(Te_mean) / vol_norm;
+    % ne_vol_avg = integrate_vol(ne_fine) / vol_norm;
+    % 
+    % % B. Global Collisionality
+    % nu_star_global_maslov = 1e-14 * Zeff * R0 * ne_vol_avg / (Te_vol_avg^2);
+    % 
+    % % C. Global Density Gradient (Linear Fit 0.2-0.8)
+    % r_norm = r_fine / a;
+    % mask_fit = (r_norm >= 0.2) & (r_norm <= 0.8);
+    % if sum(mask_fit) > 5
+    %     % ln(n) = - (1/Ln)*r + C  => Slope P(1) = -1/Ln
+    %     P = polyfit(r_fine(mask_fit), log(ne_fine(mask_fit)), 1);
+    %     Ln_inv_maslov = -P(1);
+    %     R_over_Ln_maslov = R0 * Ln_inv_maslov;
+    % else
+    %     warning('Not enough points for Maslov R/Ln fit. Using local mid value.');
+    %     [~, idx_mid] = min(abs(r_fine - a*0.5));
+    %     R_over_Ln_maslov = R0 * (-gradient(log(ne_fine), r_fine));
+    %     R_over_Ln_maslov = R_over_Ln_maslov(idx_mid);
+    % end
+    % 
+    % fprintf('      <Te>: %.2f eV, <ne>: %.2e m^-3\n', Te_vol_avg, ne_vol_avg);
+    % fprintf('      Global nu*: %.4f\n', nu_star_global_maslov);
+    % fprintf('      Global R/Ln (Maslov): %.4f\n', R_over_Ln_maslov);
 
     % Store Global Params
     collisionality.global.Te_avg = Te_vol_avg;

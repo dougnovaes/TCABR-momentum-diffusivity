@@ -1,8 +1,8 @@
 % =========================================================================
 % TCABR MOMENTUM TRANSPORT ANALYSIS PIPELINE
 % =========================================================================
-% AUTHOR: [Seu Nome/Grupo]
-% DATE: Jan 2025
+% AUTHOR: Douglas Novaes/Plasma Physics Laboratory - IFUSP
+% DATE: Dec 2025
 %
 % DESCRIPTION:
 %   This script orchestrates the complete analysis of toroidal momentum 
@@ -59,7 +59,7 @@ if ~exist(plots_dir, 'dir'),   mkdir(plots_dir);   end
 
 run_flags = struct( ...
     'setup_and_data',        true, ...  % Stage 1: Load constants & raw data
-    'profile_analyses',      true, ...  % Stage 2: Fit Vphi/Ti (Bootstrap)
+    'profile_analyses',      false, ...  % Stage 2: Fit Vphi/Ti (Bootstrap)
     'physics_profiles',      true, ...  % Stage 3: Calc Global Collisionality & Local q, s
     'helander_model',        true, ...  % Stage 4: Calc Helander Velocity (Validation)
     'neutral_and_collision', true, ...  % Stage 5: Calc Neutral Density & Frequencies
@@ -69,11 +69,11 @@ run_flags = struct( ...
 
 % Visualization Controls
 plot_flags = struct( ...
-    'justification_and_fits',  true, ... % Exp. Fits & Helander Validation
-    'thesis_method_results',   true, ... % Neutrals, Freqs & Exp. Diffusivity
-    'supporting_profiles',     true, ... % q, s, Thermal Velocities, Collisions
-    'final_comparison',        true, ... % Main Results: Exp vs Theory (2 Figures)
-    'collisionality_comparison', true ... % Diagnostic: Wesson vs Solomon
+    'justification_and_fits',   false, ... % Exp. Fits & Helander Validation
+    'thesis_method_results',    false, ... % Neutrals, Freqs & Exp. Diffusivity
+    'supporting_profiles',      false, ... % q, s, Thermal Velocities, Collisions
+    'final_comparison',         false, ... % Main Results: Exp vs Theory (2 Figures)
+    'collisionality_comparison',true ... % Diagnostic: Wesson vs Solomon
 );
 
 % Execution Behavior

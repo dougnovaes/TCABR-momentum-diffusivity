@@ -31,7 +31,7 @@ constants.plasma.m_impurity = 1.9926465E-26;      % Mass of impurity (Carbon-12)
 constants.plasma.Zi = 1;                          % Charge number of main ion (H+) [e]
 % constants.plasma.Z_impurity = 6;                  % Charge number of impurity (C6+) [e]
 constants.plasma.Zeff = 3;                        % Typical effective charge
-constants.plasma.coulomb_log = 17;                % Typical Coulomb logarithm
+constants.plasma.coulomb_log = 15;                % Typical Coulomb logarithm
 constants.plasma.kvPS = -1.83;                    % Pfirsch-Schlüter regime coefficient
 
 % --- Analysis Settings ---
