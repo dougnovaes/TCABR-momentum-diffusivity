@@ -38,7 +38,7 @@ $\chi_{\varphi}^\text{eff} = \sum_{j}\frac{1}{\lambda_{j}^{2}}
 \left( \frac{3}{4\epsilon} - 1 \right)\nu_\text{iH₀}$
 
 where:
-- the eigenvalues λⱼ are obtained from the zeros of a Fourier–Bessel expansion fitted to the experimental toroidal velocity profile,
+- the eigenvalues λⱼ, from a Helmholtz-like equation, are obtained from the zeros of a Fourier–Bessel expansion fitted to the experimental toroidal velocity profile,
 - the ion–neutral collision frequency $ν_\text{iH₀}$ depends on the ion temperature and neutral density profiles,
 - experimental uncertainties are propagated using a bootstrap Monte Carlo approach.
 
