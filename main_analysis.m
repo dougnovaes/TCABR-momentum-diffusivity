@@ -56,6 +56,8 @@ if ~exist(plots_dir, 'dir'),   mkdir(plots_dir);   end
 % -------------------------------------------------------------------------
 % Set 'true' to force re-calculation of a stage.
 % Set 'false' to load results from the cache (.mat) if available.
+% For temporary local overrides, create 'pipeline_config_local.m' in the
+% repository root. The file is ignored by Git and can override these defaults.
 
 run_flags = struct( ...
     'setup_and_data',        true, ...  % Stage 1: Load constants & raw data
@@ -78,6 +80,13 @@ plot_flags = struct( ...
 
 % Execution Behavior
 stop_on_error = true; % Halt pipeline immediately if a stage fails
+
+local_config_file = fullfile(base_dir, 'pipeline_config_local.m');
+if exist(local_config_file, 'file')
+    fprintf('>>> Loading local overrides from %s.\n', local_config_file);
+    run(local_config_file);
+    fprintf('>>> Local overrides applied.\n\n');
+end
 
 fprintf('>>> Configuration loaded.\n\n');
 

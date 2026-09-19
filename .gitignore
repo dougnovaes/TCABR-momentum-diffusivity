@@ -1,0 +1,7 @@
+# Local execution overrides
+pipeline_config_local.m
+
+# Generated analysis artefacts
+results/
+Dependency Analyzer Report.*
+archive.mlproj
